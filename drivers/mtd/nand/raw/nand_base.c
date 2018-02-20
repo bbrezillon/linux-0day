@@ -1231,9 +1231,11 @@ static int nand_setup_data_interface(struct nand_chip *chip, int chipnr)
 			chip->onfi_timing_mode_default,
 		};
 
+		chip->select_chip(mtd, chipnr);
 		ret = chip->set_features(mtd, chip,
 					 ONFI_FEATURE_ADDR_TIMING_MODE,
 					 tmode_param);
+		chip->select_chip(mtd, -1);
 		if (ret)
 			goto err;
 	}
@@ -2739,10 +2741,8 @@ int nand_reset(struct nand_chip *chip, int chipnr)
 	if (ret)
 		return ret;
 
-	chip->select_chip(mtd, chipnr);
 	chip->data_interface = saved_data_intf;
 	ret = nand_setup_data_interface(chip, chipnr);
-	chip->select_chip(mtd, -1);
 	if (ret)
 		return ret;
 
@@ -6474,10 +6474,7 @@ int nand_scan_tail(struct mtd_info *mtd)
 
 	/* Enter fastest possible mode on all dies. */
 	for (i = 0; i < chip->numchips; i++) {
-		chip->select_chip(mtd, i);
 		ret = nand_setup_data_interface(chip, i);
-		chip->select_chip(mtd, -1);
-
 		if (ret)
 			goto err_nand_manuf_cleanup;
 	}
