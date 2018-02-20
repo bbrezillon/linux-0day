@@ -1752,8 +1752,8 @@ static int mxcnd_probe(struct platform_device *pdev)
 	this->read_word = mxc_nand_read_word;
 	this->write_buf = mxc_nand_write_buf;
 	this->read_buf = mxc_nand_read_buf;
-	this->onfi_set_features = mxc_nand_onfi_set_features;
-	this->onfi_get_features = mxc_nand_onfi_get_features;
+	this->set_features = mxc_nand_onfi_set_features;
+	this->get_features = mxc_nand_onfi_get_features;
 
 	host->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(host->clk))
