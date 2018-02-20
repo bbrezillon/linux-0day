@@ -1237,11 +1237,42 @@ static int nand_setup_data_interface(struct nand_chip *chip, int chipnr)
 					 tmode_param);
 		chip->select_chip(mtd, -1);
 		if (ret)
-			goto err;
+			return ret;
 	}
 
 	ret = chip->setup_data_interface(mtd, chipnr, &chip->data_interface);
-err:
+	if (ret)
+		return ret;
+
+	if (chip->onfi_version &&
+	    (le16_to_cpu(chip->onfi_params.opt_cmd) &
+	     ONFI_OPT_CMD_SET_GET_FEATURES)) {
+		u8 tmode_param[ONFI_SUBFEATURE_PARAM_LEN] = {};
+
+		chip->select_chip(mtd, chipnr);
+		ret = chip->get_features(mtd, chip,
+					 ONFI_FEATURE_ADDR_TIMING_MODE,
+					 tmode_param);
+		chip->select_chip(mtd, -1);
+		if (ret)
+			goto err_reset_chip;
+
+		if (tmode_param[0] != chip->onfi_timing_mode_default) {
+			pr_warn("timings mode %d not acknowledged by the NAND chip\n",
+				chip->onfi_timing_mode_default);
+			goto err_reset_chip;
+		}
+	}
+
+	return 0;
+
+err_reset_chip:
+	/* Fallback to timing mode 0 */
+	nand_reset_data_interface(chip, chipnr);
+	chip->select_chip(mtd, chipnr);
+	nand_reset_op(chip);
+	chip->select_chip(mtd, -1);
+
 	return ret;
 }
 
