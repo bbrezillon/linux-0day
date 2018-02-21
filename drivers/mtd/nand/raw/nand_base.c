@@ -6647,11 +6647,23 @@ EXPORT_SYMBOL(nand_scan_tail);
  */
 int nand_scan(struct mtd_info *mtd, int maxchips)
 {
+	struct nand_chip *chip = mtd_to_nand(mtd);
 	int ret;
 
 	ret = nand_scan_ident(mtd, maxchips, NULL);
-	if (!ret)
-		ret = nand_scan_tail(mtd);
+	if (ret)
+		return ret;
+
+	if (chip->ecc.attach_chip) {
+		ret = chip->ecc.attach_chip(chip);
+		if (ret)
+			return ret;
+	}
+
+	ret = nand_scan_tail(mtd);
+	if (ret && chip->ecc.detach_chip)
+		chip->ecc.detach_chip(chip);
+
 	return ret;
 }
 EXPORT_SYMBOL(nand_scan);
@@ -6679,7 +6691,12 @@ void nand_cleanup(struct nand_chip *chip)
 
 	/* Free manufacturer priv data. */
 	nand_manufacturer_cleanup(chip);
+
+	/* Free controller specific allocations after chip identification */
+	if (chip->ecc.detach_chip)
+		chip->ecc.detach_chip(chip);
 }
+
 EXPORT_SYMBOL_GPL(nand_cleanup);
 
 /**

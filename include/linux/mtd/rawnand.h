@@ -576,6 +576,10 @@ static const struct nand_ecc_caps __name = {			\
  * @read_oob_raw:	function to read chip OOB data without ECC
  * @read_oob:	function to read chip OOB data
  * @write_oob:	function to write chip OOB data
+ * @attach_chip:	Callback that may be called between nand_detec() and
+ *			nand_scan_tail() during nand_scan() (optional).
+ * @detach_chip:	Callback that may be called if nand_scan_tail() fails
+ *			(optional).
  */
 struct nand_ecc_ctrl {
 	nand_ecc_modes_t mode;
@@ -616,6 +620,8 @@ struct nand_ecc_ctrl {
 	int (*read_oob)(struct mtd_info *mtd, struct nand_chip *chip, int page);
 	int (*write_oob)(struct mtd_info *mtd, struct nand_chip *chip,
 			int page);
+	int (*attach_chip)(struct nand_chip *chip);
+	void (*detach_chip)(struct nand_chip *chip);
 };
 
 /**
