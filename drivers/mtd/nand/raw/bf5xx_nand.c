@@ -697,33 +697,31 @@ static int bf5xx_nand_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int bf5xx_nand_scan(struct mtd_info *mtd)
+static int bf5xx_nand_attach_chip(struct nand_chip *chip)
 {
-	struct nand_chip *chip = mtd_to_nand(mtd);
-	int ret;
+	struct mtd_info *mtd = nand_to_mtd(chip);
 
-	ret = nand_scan_ident(mtd, 1, NULL);
-	if (ret)
-		return ret;
+	if (!hardware_ecc)
+		return 0;
 
-	if (hardware_ecc) {
-		/*
-		 * for nand with page size > 512B, think it as several sections with 512B
-		 */
-		if (likely(mtd->writesize >= 512)) {
-			chip->ecc.size = 512;
-			chip->ecc.bytes = 6;
-			chip->ecc.strength = 2;
-		} else {
-			chip->ecc.size = 256;
-			chip->ecc.bytes = 3;
-			chip->ecc.strength = 1;
-			bfin_write_NFC_CTL(bfin_read_NFC_CTL() & ~(1 << NFC_PG_SIZE_OFFSET));
-			SSYNC();
-		}
+	/*
+	 * For NAND with page size > 512B, it is like if it had several sections
+	 * of 512B.
+	 */
+	if (likely(mtd->writesize >= 512)) {
+		chip->ecc.size = 512;
+		chip->ecc.bytes = 6;
+		chip->ecc.strength = 2;
+	} else {
+		chip->ecc.size = 256;
+		chip->ecc.bytes = 3;
+		chip->ecc.strength = 1;
+		bfin_write_NFC_CTL(bfin_read_NFC_CTL() &
+				   ~(1 << NFC_PG_SIZE_OFFSET));
+		SSYNC();
 	}
 
-	return	nand_scan_tail(mtd);
+	return 0;
 }
 
 /*
@@ -821,10 +819,10 @@ static int bf5xx_nand_probe(struct platform_device *pdev)
 	}
 
 	/* scan hardware nand chip and setup mtd info data struct */
-	if (bf5xx_nand_scan(mtd)) {
-		err = -ENXIO;
+	chip->ecc.attach_chip = bf5xx_nand_attach_chip;
+	err = nand_scan(mtd, 1);
+	if (err)
 		goto out_err_nand_scan;
-	}
 
 #ifdef CONFIG_MTD_NAND_BF5XX_BOOTROM_ECC
 	chip->badblockpos = 63;
