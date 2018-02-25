@@ -1691,7 +1691,7 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
 	chip->ecc.strength = pdata->ecc_strength;
 	chip->ecc.size = pdata->ecc_step_size;
 
-	ret = nand_scan_ident(mtd, 1, NULL);
+//	ret = nand_scan_ident(mtd, 1, NULL);
 	if (ret)
 		return ret;
 
@@ -1772,7 +1772,8 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
 	if (!pdata->keep_config)
 		pxa3xx_nand_config_tail(info);
 
-	return nand_scan_tail(mtd);
+//	return nand_scan_tail(mtd);
+	return 0;
 }
 
 static int alloc_nand_resource(struct platform_device *pdev)
