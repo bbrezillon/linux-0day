@@ -2263,12 +2263,14 @@ scan_tail:
 
 	err = mtd_device_register(mtd, NULL, 0);
 	if (err)
-		goto return_error;
+		goto release_nand;
 
 	platform_set_drvdata(pdev, mtd);
 
 	return 0;
 
+release_nand:
+	nand_release(mtd);
 return_error:
 	if (!IS_ERR_OR_NULL(info->dma))
 		dma_release_channel(info->dma);
