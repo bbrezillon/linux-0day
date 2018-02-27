@@ -1201,6 +1201,7 @@ int nand_op_parser_exec_op(struct nand_chip *chip,
  *			  chipnr is set to %NAND_DATA_IFACE_CHECK_ONLY this
  *			  means the configuration should not be applied but
  *			  only checked.
+ * @flash_ids:		[OPTIONAL] local NAND flash ID table
  * @bbt:		[INTERN] bad block table pointer
  * @bbt_td:		[REPLACEABLE] bad block table descriptor for flash
  *			lookup.
@@ -1286,6 +1287,8 @@ struct nand_chip {
 	struct nand_ecc_ctrl ecc;
 	unsigned long buf_align;
 	struct nand_hw_control hwcontrol;
+
+	struct nand_flash_dev *flash_ids;
 
 	uint8_t *bbt;
 	struct nand_bbt_descr *bbt_td;

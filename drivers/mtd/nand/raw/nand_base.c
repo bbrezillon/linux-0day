@@ -5594,8 +5594,12 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
 	manufacturer = nand_get_manufacturer(maf_id);
 	chip->manufacturer.desc = manufacturer;
 
-	if (!type)
-		type = nand_flash_ids;
+	if (!type) {
+		if (chip->flash_ids)
+			type = chip->flash_ids;
+		else
+			type = nand_flash_ids;
+	}
 
 	/*
 	 * Save the NAND_BUSWIDTH_16 flag before letting auto-detection logic
