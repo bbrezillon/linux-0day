@@ -5099,7 +5099,7 @@ ext_out:
 static int nand_flash_detect_onfi(struct nand_chip *chip)
 {
 	struct mtd_info *mtd = nand_to_mtd(chip);
-	struct nand_onfi_params *p = &chip->onfi_params;
+	struct nand_onfi_params *p;
 	char id[4];
 	int i, ret, val;
 
@@ -5108,14 +5108,23 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
 	if (ret || strncmp(id, "ONFI", 4))
 		return 0;
 
+	/* ONFI chip: allocate a buffer to hold its parameter page */
+	p = kzalloc(sizeof(*p), GFP_KERNEL);
+	if (!p)
+		return -ENOMEM;
+
 	ret = nand_read_param_page_op(chip, 0, NULL, 0);
-	if (ret)
-		return 0;
+	if (ret) {
+		ret = 0;
+		goto free_onfi_param_page;
+	}
 
 	for (i = 0; i < 3; i++) {
 		ret = nand_read_data_op(chip, p, sizeof(*p), true);
-		if (ret)
-			return 0;
+		if (ret) {
+			ret = 0;
+			goto free_onfi_param_page;
+		}
 
 		if (onfi_crc16(ONFI_CRC_BASE, (uint8_t *)p, 254) ==
 				le16_to_cpu(p->crc)) {
@@ -5125,7 +5134,7 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
 
 	if (i == 3) {
 		pr_err("Could not find valid ONFI parameter page; aborting\n");
-		return 0;
+		goto free_onfi_param_page;
 	}
 
 	/* Check version */
@@ -5143,7 +5152,9 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
 
 	if (!chip->onfi_version) {
 		pr_info("unsupported ONFI version: %d\n", val);
-		return 0;
+		goto free_onfi_param_page;
+	} else {
+		ret = 1;
 	}
 
 	sanitize_string(p->manufacturer, sizeof(p->manufacturer));
@@ -5216,7 +5227,9 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
 	memcpy(chip->parameters.onfi_params.vendor, p->vendor,
 	       sizeof(p->vendor));
 
-	return 1;
+free_onfi_param_page:
+	kfree(p);
+	return ret;
 }
 
 /*
@@ -5611,7 +5624,10 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
 	chip->onfi_version = 0;
 	if (!type->name || !type->pagesize) {
 		/* Check if the chip is ONFI compliant */
-		if (nand_flash_detect_onfi(chip))
+		ret = nand_flash_detect_onfi(chip);
+		if (ret < 0)
+			return ret;
+		if (ret)
 			goto ident_done;
 
 		/* Check if the chip is JEDEC compliant */
