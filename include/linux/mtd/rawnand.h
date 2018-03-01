@@ -1186,8 +1186,6 @@ int nand_op_parser_exec_op(struct nand_chip *chip,
  *			non 0 if JEDEC supported.
  * @onfi_params:	[INTERN] holds the ONFI page parameter when ONFI is
  *			supported, 0 otherwise.
- * @jedec_params:	[INTERN] holds the JEDEC parameter page when JEDEC is
- *			supported, 0 otherwise.
  * @max_bb_per_die:	[INTERN] the max number of bad blocks each die of a
  *			this nand device will encounter their life times.
  * @blocks_per_die:	[INTERN] The number of PEBs in a die
@@ -1268,10 +1266,7 @@ struct nand_chip {
 	struct nand_id id;
 	int onfi_version;
 	int jedec_version;
-	union {
-		struct nand_onfi_params	onfi_params;
-		struct nand_jedec_params jedec_params;
-	};
+	struct nand_onfi_params	onfi_params;
 	struct nand_parameters parameters;
 	u16 max_bb_per_die;
 	u32 blocks_per_die;
@@ -1600,13 +1595,6 @@ static inline int nand_opcode_8bits(unsigned int command)
 		break;
 	}
 	return 0;
-}
-
-/* return the supported JEDEC features. */
-static inline int jedec_feature(struct nand_chip *chip)
-{
-	return chip->jedec_version ? le16_to_cpu(chip->jedec_params.features)
-		: 0;
 }
 
 /* get timing characteristics from ONFI timing mode. */
