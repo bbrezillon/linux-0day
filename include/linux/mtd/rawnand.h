@@ -429,6 +429,11 @@ struct nand_jedec_params {
 	__le16 crc;
 } __packed;
 
+struct nand_parameters {
+	char model[100];
+	bool supports_set_get_features;
+};
+
 /* The maximum expected count of bytes in the NAND ID sequence */
 #define NAND_MAX_ID_LEN 8
 
@@ -1249,6 +1254,7 @@ struct nand_chip {
 		struct nand_onfi_params	onfi_params;
 		struct nand_jedec_params jedec_params;
 	};
+	struct nand_parameters parameters;
 	u16 max_bb_per_die;
 	u32 blocks_per_die;
 

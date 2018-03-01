@@ -1174,9 +1174,7 @@ int nand_get_features(struct nand_chip *chip, int addr,
 {
 	struct mtd_info *mtd = nand_to_mtd(chip);
 
-	if (!chip->onfi_version ||
-	    !(le16_to_cpu(chip->onfi_params.opt_cmd)
-	      & ONFI_OPT_CMD_SET_GET_FEATURES))
+	if (!chip->parameters.supports_set_get_features)
 		return -ENOTSUPP;
 
 	return chip->get_features(mtd, chip, addr, subfeature_param);
@@ -1197,9 +1195,7 @@ int nand_set_features(struct nand_chip *chip, int addr,
 {
 	struct mtd_info *mtd = nand_to_mtd(chip);
 
-	if (!chip->onfi_version ||
-	    !(le16_to_cpu(chip->onfi_params.opt_cmd)
-	      & ONFI_OPT_CMD_SET_GET_FEATURES))
+	if (!chip->parameters.supports_set_get_features)
 		return -ENOTSUPP;
 
 	return chip->set_features(mtd, chip, addr, subfeature_param);
@@ -5150,8 +5146,9 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
 
 	sanitize_string(p->manufacturer, sizeof(p->manufacturer));
 	sanitize_string(p->model, sizeof(p->model));
+	memcpy(chip->parameters.model, p->model, sizeof(p->model));
 	if (!mtd->name)
-		mtd->name = p->model;
+		mtd->name = chip->parameters.model;
 
 	mtd->writesize = le32_to_cpu(p->byte_per_page);
 
@@ -5197,6 +5194,10 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
 	} else {
 		pr_warn("Could not retrieve ONFI ECC requirements\n");
 	}
+
+	/* Save some parameters from the parameter page for future use */
+	if (le16_to_cpu(p->opt_cmd) & ONFI_OPT_CMD_SET_GET_FEATURES)
+		chip->parameters.supports_set_get_features = true;
 
 	return 1;
 }
@@ -5250,8 +5251,9 @@ static int nand_flash_detect_jedec(struct nand_chip *chip)
 
 	sanitize_string(p->manufacturer, sizeof(p->manufacturer));
 	sanitize_string(p->model, sizeof(p->model));
+	memcpy(chip->parameters.model, p->model, sizeof(p->model));
 	if (!mtd->name)
-		mtd->name = p->model;
+		mtd->name = chip->parameters.model;
 
 	mtd->writesize = le32_to_cpu(p->byte_per_page);
 
@@ -5652,17 +5654,9 @@ ident_done:
 
 	pr_info("device found, Manufacturer ID: 0x%02x, Chip ID: 0x%02x\n",
 		maf_id, dev_id);
-
-	if (chip->onfi_version)
-		pr_info("%s %s\n", nand_manufacturer_name(manufacturer),
-			chip->onfi_params.model);
-	else if (chip->jedec_version)
-		pr_info("%s %s\n", nand_manufacturer_name(manufacturer),
-			chip->jedec_params.model);
-	else
-		pr_info("%s %s\n", nand_manufacturer_name(manufacturer),
-			type->name);
-
+	pr_info("%s %s\n", nand_manufacturer_name(manufacturer),
+		(chip->onfi_version || chip->jedec_version) ?
+		chip->parameters.model : type->name);
 	pr_info("%d MiB, %s, erase size: %d KiB, page size: %d, OOB size: %d\n",
 		(int)(chip->chipsize >> 20), nand_is_slc(chip) ? "SLC" : "MLC",
 		mtd->erasesize >> 10, mtd->writesize, mtd->oobsize);
