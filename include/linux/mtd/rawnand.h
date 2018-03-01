@@ -21,6 +21,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/flashchip.h>
 #include <linux/mtd/bbm.h>
+#include <linux/types.h>
 
 struct mtd_info;
 struct nand_flash_dev;
@@ -235,7 +236,8 @@ struct nand_chip;
 #define ONFI_TIMING_MODE_5		(1 << 5)
 #define ONFI_TIMING_MODE_UNKNOWN	(1 << 6)
 
-/* ONFI feature address */
+/* ONFI feature number/address */
+#define ONFI_FEATURE_NUMBER		256
 #define ONFI_FEATURE_ADDR_TIMING_MODE	0x1
 
 /* Vendor-specific feature address (Micron) */
@@ -443,6 +445,8 @@ struct nand_parameters {
 	/* Generic parameters */
 	char model[100];
 	bool supports_set_get_features;
+	DECLARE_BITMAP(set_feature_list, ONFI_FEATURE_NUMBER);
+	DECLARE_BITMAP(get_feature_list, ONFI_FEATURE_NUMBER);
 
 	/* ONFI parameters */
 	struct onfi_params onfi_params;
