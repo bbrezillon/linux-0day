@@ -57,9 +57,9 @@ static int micron_nand_setup_read_retry(struct mtd_info *mtd, int retry_mode)
 static int micron_nand_onfi_init(struct nand_chip *chip)
 {
 	struct nand_parameters *p = &chip->parameters;
-	struct nand_onfi_vendor_micron *micron = (void *)p->onfi_params.vendor;
+	struct nand_onfi_vendor_micron *micron = (void *)p->onfi_params->vendor;
 
-	if (chip->onfi_version && p->onfi_params.vendor_revision) {
+	if (p->onfi_params && p->onfi_params->vendor_revision) {
 		chip->read_retries = micron->read_retry_options;
 		chip->setup_read_retry = micron_nand_setup_read_retry;
 	}

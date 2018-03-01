@@ -5100,6 +5100,7 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
 {
 	struct mtd_info *mtd = nand_to_mtd(chip);
 	struct nand_onfi_params *p;
+	struct onfi_params *op;
 	char *model;
 	char id[4];
 	int i, ret, val;
@@ -5154,8 +5155,6 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
 	if (!chip->onfi_version) {
 		pr_info("unsupported ONFI version: %d\n", val);
 		goto free_onfi_param_page;
-	} else {
-		ret = 1;
 	}
 
 	sanitize_string(p->manufacturer, sizeof(p->manufacturer));
@@ -5224,19 +5223,31 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
 		bitmap_set(chip->parameters.set_feature_list,
 			   ONFI_FEATURE_ADDR_TIMING_MODE, 1);
 	}
-	chip->parameters.onfi_params.t_prog = le16_to_cpu(p->t_prog);
-	chip->parameters.onfi_params.t_bers = le16_to_cpu(p->t_bers);
-	chip->parameters.onfi_params.t_r = le16_to_cpu(p->t_r);
-	chip->parameters.onfi_params.t_ccs = le16_to_cpu(p->t_ccs);
-	chip->parameters.onfi_params.async_timing_mode =
-		le16_to_cpu(p->async_timing_mode);
-	chip->parameters.onfi_params.vendor_revision =
-		le16_to_cpu(p->vendor_revision);
-	memcpy(chip->parameters.onfi_params.vendor, p->vendor,
-	       sizeof(p->vendor));
 
+	op = kzalloc(sizeof(*op), GFP_KERNEL);
+	if (!op) {
+		ret = -ENOMEM;
+		goto free_model;
+	}
+	op->t_prog = le16_to_cpu(p->t_prog);
+	op->t_bers = le16_to_cpu(p->t_bers);
+	op->t_r = le16_to_cpu(p->t_r);
+	op->t_ccs = le16_to_cpu(p->t_ccs);
+	op->async_timing_mode = le16_to_cpu(p->async_timing_mode);
+	op->vendor_revision = le16_to_cpu(p->vendor_revision);
+	memcpy(op->vendor, p->vendor, sizeof(p->vendor));
+	chip->parameters.onfi_params = op;
+
+	/* Identification done, free the full ONFI parameter page and exit */
+	kfree(p);
+
+	return 1;
+
+free_model:
+	kfree(model);
 free_onfi_param_page:
 	kfree(p);
+
 	return ret;
 }
 
@@ -5966,6 +5977,8 @@ static int nand_scan_ident(struct mtd_info *mtd, int maxchips,
 static void nand_scan_ident_cleanup(struct nand_chip *chip)
 {
 	kfree(chip->parameters.model);
+	kfree(chip->parameters.onfi_params);
+
 }
 
 static int nand_set_ecc_soft_ops(struct mtd_info *mtd)

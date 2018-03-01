@@ -292,6 +292,7 @@ int onfi_fill_data_interface(struct nand_chip *chip,
 			     int timing_mode)
 {
 	struct nand_data_interface *iface = &chip->data_interface;
+	struct onfi_params *onfi_params = chip->parameters.onfi_params;
 
 	if (type != NAND_SDR_IFACE)
 		return -EINVAL;
@@ -306,17 +307,16 @@ int onfi_fill_data_interface(struct nand_chip *chip,
 	 * tR, tPROG, tCCS, ...
 	 * These information are part of the ONFI parameter page.
 	 */
-	if (chip->onfi_version) {
-		struct nand_parameters *params = &chip->parameters;
+	if (onfi_params) {
 		struct nand_sdr_timings *timings = &iface->timings.sdr;
 
 		/* microseconds -> picoseconds */
-		timings->tPROG_max = 1000000ULL * params->onfi_params.t_prog;
-		timings->tBERS_max = 1000000ULL * params->onfi_params.t_bers;
-		timings->tR_max = 1000000ULL * params->onfi_params.t_r;
+		timings->tPROG_max = 1000000ULL * onfi_params->t_prog;
+		timings->tBERS_max = 1000000ULL * onfi_params->t_bers;
+		timings->tR_max = 1000000ULL * onfi_params->t_r;
 
 		/* nanoseconds -> picoseconds */
-		timings->tCCS_min = 1000UL * params->onfi_params.t_ccs;
+		timings->tCCS_min = 1000UL * onfi_params->t_ccs;
 	}
 
 	return 0;
