@@ -831,11 +831,16 @@ static int bf5xx_nand_probe(struct platform_device *pdev)
 #endif
 
 	/* add NAND partition */
-	bf5xx_nand_add_partition(info);
+	err = bf5xx_nand_add_partition(info);
+	if (err)
+		goto out_err_release_nand;
 
 	dev_dbg(&pdev->dev, "initialised ok\n");
+
 	return 0;
 
+out_err_release_nand:
+	nand_release(mtd);
 out_err_nand_scan:
 	bf5xx_nand_dma_remove(info);
 out_err:
