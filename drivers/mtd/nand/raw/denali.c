@@ -1384,10 +1384,12 @@ int denali_init(struct denali_nand_info *denali)
 	ret = mtd_device_register(mtd, NULL, 0);
 	if (ret) {
 		dev_err(denali->dev, "Failed to register MTD: %d\n", ret);
-		goto free_buf;
+		goto detach;
 	}
 	return 0;
 
+detach:
+	nand_release(mtd);
 free_buf:
 	kfree(denali->buf);
 disable_irq:
