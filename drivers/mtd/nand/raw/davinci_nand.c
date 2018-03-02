@@ -826,7 +826,7 @@ static int nand_davinci_probe(struct platform_device *pdev)
 	else
 		ret = mtd_device_register(mtd, NULL, 0);
 	if (ret < 0)
-		goto err;
+		goto release_nand;
 
 	val = davinci_nand_readl(info, NRCSR_OFFSET);
 	dev_info(&pdev->dev, "controller rev. %d.%d\n",
@@ -834,14 +834,16 @@ static int nand_davinci_probe(struct platform_device *pdev)
 
 	return 0;
 
+release_nand:
+	nand_release(mtd);
 err:
 	clk_disable_unprepare(info->clk);
-
 err_clk_enable:
 	spin_lock_irq(&davinci_nand_lock);
 	if (info->chip.ecc.mode == NAND_ECC_HW_SYNDROME)
 		ecc4_busy = false;
 	spin_unlock_irq(&davinci_nand_lock);
+
 	return ret;
 }
 
