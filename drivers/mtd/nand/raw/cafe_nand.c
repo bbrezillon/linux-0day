@@ -774,21 +774,26 @@ static int cafe_nand_probe(struct pci_dev *pdev,
 	pci_set_drvdata(pdev, mtd);
 
 	mtd->name = "cafe_nand";
-	mtd_device_parse_register(mtd, part_probes, NULL, NULL, 0);
+	err = mtd_device_parse_register(mtd, part_probes, NULL, NULL, 0);
+	if (err)
+		goto out_release_nand;
 
 	goto out;
 
- out_free_dma:
+out_release_nand:
+	nand_release(mtd);
+out_free_dma:
 	dma_free_coherent(&cafe->pdev->dev, 2112, cafe->dmabuf, cafe->dmaaddr);
- out_irq:
+out_irq:
 	/* Disable NAND IRQ in global IRQ mask register */
 	cafe_writel(cafe, ~1 & cafe_readl(cafe, GLOBAL_IRQ_MASK), GLOBAL_IRQ_MASK);
 	free_irq(pdev->irq, mtd);
- out_ior:
+out_ior:
 	pci_iounmap(pdev, cafe->mmio);
- out_free_mtd:
+out_free_mtd:
 	kfree(cafe);
- out:
+out:
+
 	return err;
 }
 
