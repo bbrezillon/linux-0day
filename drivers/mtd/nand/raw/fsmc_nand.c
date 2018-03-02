@@ -1123,14 +1123,16 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
 	mtd->name = "nand";
 	ret = mtd_device_register(mtd, NULL, 0);
 	if (ret)
-		goto err_probe;
+		goto err_release_nand;
 
 	platform_set_drvdata(pdev, host);
 	dev_info(&pdev->dev, "FSMC NAND driver registration successful\n");
+
 	return 0;
 
+err_release_nand:
+	nand_release(mtd);
 err_probe:
-err_scan_ident:
 	if (host->mode == USE_DMA_ACCESS)
 		dma_release_channel(host->write_dma_chan);
 err_req_write_chnl:
