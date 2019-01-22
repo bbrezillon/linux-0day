@@ -627,20 +627,20 @@ int mtd_add_partition(struct mtd_info *parent, const char *name,
 EXPORT_SYMBOL_GPL(mtd_add_partition);
 
 /**
- * __mtd_del_partition - delete MTD partition
+ * mtd_del_partition_locked - delete MTD partition
  *
  * @priv: internal MTD struct for partition to be deleted
  *
  * This function must be called with the partitions mutex locked.
  */
-static int __mtd_del_partition(struct mtd_part *priv)
+static int mtd_del_partition_locked(struct mtd_part *priv)
 {
 	struct mtd_part *child, *next;
 	int err;
 
 	list_for_each_entry_safe(child, next, &mtd_partitions, list) {
 		if (child->parent == &priv->mtd) {
-			err = __mtd_del_partition(child);
+			err = mtd_del_partition_locked(child);
 			if (err)
 				return err;
 		}
@@ -670,7 +670,7 @@ int del_mtd_partitions(struct mtd_info *mtd)
 	mutex_lock(&mtd_partitions_mutex);
 	list_for_each_entry_safe(slave, next, &mtd_partitions, list)
 		if (slave->parent == mtd) {
-			ret = __mtd_del_partition(slave);
+			ret = mtd_del_partition_locked(slave);
 			if (ret < 0)
 				err = ret;
 		}
@@ -688,7 +688,7 @@ int mtd_del_partition(struct mtd_info *mtd, int partno)
 	list_for_each_entry_safe(slave, next, &mtd_partitions, list)
 		if ((slave->parent == mtd) &&
 		    (slave->mtd.index == partno)) {
-			ret = __mtd_del_partition(slave);
+			ret = mtd_del_partition_locked(slave);
 			break;
 		}
 	mutex_unlock(&mtd_partitions_mutex);
