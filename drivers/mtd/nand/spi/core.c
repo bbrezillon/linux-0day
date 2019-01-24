@@ -238,14 +238,15 @@ static int spinand_read_from_cache_op(struct spinand_device *spinand,
 
 	while (nbytes) {
 		ret = spi_mem_dirmap_read(rdesc, column, nbytes, buf);
-		if (!ret || ret > nbytes)
-			ret = -EIO;
-
 		if (ret < 0)
 			return ret;
 
+		if (!ret || ret > nbytes)
+			return -EIO;
+
 		nbytes -= ret;
 		column += ret;
+		buf += ret;
 	}
 
 	if (req->datalen)
@@ -273,6 +274,7 @@ static int spinand_write_to_cache_op(struct spinand_device *spinand,
 	struct mtd_info *mtd = nanddev_to_mtd(nand);
 	struct spi_mem_dirmap_desc *wdesc;
 	unsigned int nbytes, column = 0;
+	void *buf = spinand->databuf;
 	ssize_t ret;
 
 	nbytes = nanddev_page_size(nand) + nanddev_per_page_oobsize(nand);
@@ -296,16 +298,16 @@ static int spinand_write_to_cache_op(struct spinand_device *spinand,
 	wdesc = spinand->dirmaps[req->pos.plane].wdesc;
 
 	while (nbytes) {
-		ret = spi_mem_dirmap_read(wdesc, column, nbytes,
-					  spinand->databuf + column);
-		if (!ret || ret > nbytes)
-			ret = -EIO;
-
+		ret = spi_mem_dirmap_write(wdesc, column, nbytes, buf);
 		if (ret < 0)
 			return ret;
 
+		if (!ret || ret > nbytes)
+			return -EIO;
+
 		nbytes -= ret;
 		column += ret;
+		buf += ret;
 	}
 
 	return 0;
@@ -759,21 +761,6 @@ static void spinand_destroy_dirmaps(struct spinand_device *spinand)
 
 	for (i = 0; i < nand->memorg.planes_per_lun; i++)
 		spinand_destroy_dirmap(spinand, i);
-}
-
-const struct spi_mem_op *
-spinand_find_supported_op(struct spinand_device *spinand,
-			  const struct spi_mem_op *ops,
-			  unsigned int nops)
-{
-	unsigned int i;
-
-	for (i = 0; i < nops; i++) {
-		if (spi_mem_supports_op(spinand->spimem, &ops[i]))
-			return &ops[i];
-	}
-
-	return NULL;
 }
 
 static const struct nand_ops spinand_ops = {
