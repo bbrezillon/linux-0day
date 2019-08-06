@@ -1374,40 +1374,48 @@ static void exynos_dsi_unregister_te_irq(struct exynos_dsi *dsi)
 	}
 }
 
-static void exynos_dsi_enable(struct drm_encoder *encoder)
+static void exynos_dsi_pre_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
-	int ret;
 
 	if (dsi->state & DSIM_STATE_ENABLED)
 		return;
 
 	pm_runtime_get_sync(dsi->dev);
-	dsi->state |= DSIM_STATE_ENABLED;
 
 	if (dsi->panel) {
+		int ret;
+
 		ret = drm_panel_prepare(dsi->panel);
 		WARN_ON(ret && ret != -ENOSYS);
-	} else {
-		drm_bridge_pre_enable(dsi->out_bridge);
 	}
+}
+
+static void exynos_dsi_enable(struct drm_bridge *bridge)
+{
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
+	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
+
+	if (dsi->state & DSIM_STATE_ENABLED)
+		return;
 
 	exynos_dsi_set_display_mode(dsi);
 	exynos_dsi_set_display_enable(dsi, true);
 
 	if (dsi->panel) {
+		int ret;
+
 		ret = drm_panel_enable(dsi->panel);
 		WARN_ON(ret && ret != -ENOSYS);
-	} else {
-		drm_bridge_enable(dsi->out_bridge);
 	}
 
-	dsi->state |= DSIM_STATE_VIDOUT_AVAILABLE;
-	return;
+	dsi->state |= DSIM_STATE_VIDOUT_AVAILABLE | DSIM_STATE_ENABLED;
 }
 
-static void exynos_dsi_disable(struct drm_encoder *encoder)
+static void exynos_dsi_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
 
 	if (!(dsi->state & DSIM_STATE_ENABLED))
@@ -1415,11 +1423,18 @@ static void exynos_dsi_disable(struct drm_encoder *encoder)
 
 	dsi->state &= ~DSIM_STATE_VIDOUT_AVAILABLE;
 
-	drm_panel_disable(dsi->panel);
-	drm_bridge_disable(dsi->out_bridge);
 	exynos_dsi_set_display_enable(dsi, false);
 	drm_panel_unprepare(dsi->panel);
-	drm_bridge_post_disable(dsi->out_bridge);
+}
+
+static void exynos_dsi_post_disable(struct drm_bridge *bridge)
+{
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
+	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
+
+	if (!(dsi->state & DSIM_STATE_ENABLED))
+		return;
+
 	dsi->state &= ~DSIM_STATE_ENABLED;
 	pm_runtime_put_sync(dsi->dev);
 }
@@ -1489,9 +1504,11 @@ static int exynos_dsi_create_connector(struct drm_encoder *encoder)
 	return 0;
 }
 
-static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
+static const struct drm_bridge_funcs exynos_dsi_bridge_funcs = {
+	.pre_enable = exynos_dsi_pre_enable,
 	.enable = exynos_dsi_enable,
 	.disable = exynos_dsi_disable,
+	.post_disable = exynos_dsi_post_disable,
 };
 
 static const struct drm_encoder_funcs exynos_dsi_encoder_funcs = {
@@ -1512,7 +1529,6 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
 	if (out_bridge) {
 		drm_bridge_attach(encoder, out_bridge, NULL);
 		dsi->out_bridge = out_bridge;
-		encoder->bridge.next = NULL;
 	} else {
 		int ret = exynos_dsi_create_connector(encoder);
 
@@ -1569,7 +1585,8 @@ static int exynos_dsi_host_detach(struct mipi_dsi_host *host,
 
 	if (dsi->panel) {
 		mutex_lock(&drm->mode_config.mutex);
-		exynos_dsi_disable(&dsi->encoder);
+		exynos_dsi_disable(&dsi->encoder.bridge);
+		exynos_dsi_post_disable(&dsi->encoder.bridge);
 		drm_panel_detach(dsi->panel);
 		dsi->panel = NULL;
 		dsi->connector.status = connector_status_disconnected;
@@ -1674,10 +1691,9 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
 	struct drm_bridge *in_bridge;
 	int ret;
 
+	encoder->bridge.funcs = &exynos_dsi_bridge_funcs;
 	drm_encoder_init(drm_dev, encoder, &exynos_dsi_encoder_funcs,
 			 DRM_MODE_ENCODER_TMDS, NULL);
-
-	drm_encoder_helper_add(encoder, &exynos_dsi_encoder_helper_funcs);
 
 	ret = exynos_drm_set_possible_crtcs(encoder, EXYNOS_DISPLAY_TYPE_LCD);
 	if (ret < 0)
@@ -1698,7 +1714,8 @@ static void exynos_dsi_unbind(struct device *dev, struct device *master,
 	struct drm_encoder *encoder = dev_get_drvdata(dev);
 	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
 
-	exynos_dsi_disable(encoder);
+	exynos_dsi_disable(&encoder->bridge);
+	exynos_dsi_post_disable(&encoder->bridge);
 
 	mipi_dsi_host_unregister(&dsi->dsi_host);
 }
