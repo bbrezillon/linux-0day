@@ -264,7 +264,8 @@ struct drm_bridge_funcs {
 	 * preceding element is a bridge this means it's called before that
 	 * bridge's @atomic_pre_enable or @pre_enable function. If the preceding
 	 * element is a &drm_encoder it's called right before the encoder's
-	 * &drm_encoder_helper_funcs.atomic_enable hook.
+	 * &drm_encoder_helper_funcs.atomic_enable hook. This hook is passed the
+	 * old bridge state (the new one can be retrieved from bridge->state).
 	 *
 	 * The display pipe (i.e. clocks and timing signals) feeding this bridge
 	 * will not yet be running when this callback is called. The bridge must
@@ -280,7 +281,7 @@ struct drm_bridge_funcs {
 	 * The @atomic_pre_enable callback is optional.
 	 */
 	void (*atomic_pre_enable)(struct drm_bridge *bridge,
-				  struct drm_atomic_state *state);
+				  struct drm_bridge_state *old_bridge_state);
 
 	/**
 	 * @atomic_enable:
@@ -290,7 +291,9 @@ struct drm_bridge_funcs {
 	 * preceding element is a bridge this means it's called after that
 	 * bridge's @atomic_enable or @enable function. If the preceding element
 	 * is a &drm_encoder it's called right after the encoder's
-	 * &drm_encoder_helper_funcs.atomic_enable hook.
+	 * &drm_encoder_helper_funcs.atomic_enable hook. This hook is passed
+	 * the old bridge state (the new one can be retrieved from
+	 * bridge->state).
 	 *
 	 * The bridge can assume that the display pipe (i.e. clocks and timing
 	 * signals) feeding it is running when this callback is called. This
@@ -305,7 +308,7 @@ struct drm_bridge_funcs {
 	 * The enable callback is optional.
 	 */
 	void (*atomic_enable)(struct drm_bridge *bridge,
-			      struct drm_atomic_state *state);
+			      struct drm_bridge_state *old_bridge_state);
 	/**
 	 * @atomic_disable:
 	 *
@@ -314,7 +317,9 @@ struct drm_bridge_funcs {
 	 * preceding element is a bridge this means it's called before that
 	 * bridge's @atomic_disable or @disable vfunc. If the preceding element
 	 * is a &drm_encoder it's called right before the
-	 * &drm_encoder_helper_funcs.atomic_disable hook.
+	 * &drm_encoder_helper_funcs.atomic_disable hook. This hook is passed
+	 * the old bridge state (the new one can be retrieved from
+	 * bridge->state).
 	 *
 	 * The bridge can assume that the display pipe (i.e. clocks and timing
 	 * signals) feeding it is still running when this callback is called.
@@ -328,7 +333,7 @@ struct drm_bridge_funcs {
 	 * The disable callback is optional.
 	 */
 	void (*atomic_disable)(struct drm_bridge *bridge,
-			       struct drm_atomic_state *state);
+			       struct drm_bridge_state *old_bridge_state);
 
 	/**
 	 * @atomic_post_disable:
@@ -338,7 +343,9 @@ struct drm_bridge_funcs {
 	 * element is a bridge this means it's called after that bridge's
 	 * @atomic_post_disable or @post_disable function. If the preceding
 	 * element is a &drm_encoder it's called right after the encoder's
-	 * &drm_encoder_helper_funcs.atomic_disable hook.
+	 * &drm_encoder_helper_funcs.atomic_disable hook. This hook is passed
+	 * the old bridge state (the new one can be retrieved from
+	 * bridge->state).
 	 *
 	 * The bridge must assume that the display pipe (i.e. clocks and timing
 	 * signals) feeding it is no longer running when this callback is
@@ -354,7 +361,7 @@ struct drm_bridge_funcs {
 	 * The post_disable callback is optional.
 	 */
 	void (*atomic_post_disable)(struct drm_bridge *bridge,
-				    struct drm_atomic_state *state);
+				    struct drm_bridge_state *old_bridge_state);
 
 	/**
 	 * @atomic_duplicate_state:
