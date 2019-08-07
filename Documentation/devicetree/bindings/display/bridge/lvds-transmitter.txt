@@ -36,6 +36,18 @@ graph bindings specified in Documentation/devicetree/bindings/graph.txt.
 - Video port 0 for parallel input
 - Video port 1 for LVDS output
 
+Optional port 0 node properties:
+
+- data-mapping: can be one of the following values
+	"rgb-24"
+	"rgb-18"
+
+Optional port 0 node properties:
+
+- data-mapping: can be one of the following values
+	"jeida-18"
+	"jeida-24"
+	"vesa-24"
 
 Example
 -------
