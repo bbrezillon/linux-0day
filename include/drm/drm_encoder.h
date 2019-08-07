@@ -174,6 +174,13 @@ struct drm_encoder {
 	struct drm_crtc *crtc;
 
 	/**
+	 * @bridge_chain: Bridges attached to this encoder. The first entry of
+	 * this list is always &drm_encoder.bridge. It may be followed by other
+	 * bridge entities.
+	 */
+	struct list_head bridge_chain;
+
+	/**
 	 * @bridge: Bridge representing our encoder. Other bridges might be
 	 * linked to this dummy bridge element to form an encoder chain.
 	 */

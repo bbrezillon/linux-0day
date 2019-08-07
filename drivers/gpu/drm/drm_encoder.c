@@ -143,6 +143,7 @@ int drm_encoder_init(struct drm_device *dev,
 		goto out_put;
 	}
 
+	INIT_LIST_HEAD(&encoder->bridge_chain);
 	if (!encoder->bridge.funcs)
 		encoder->bridge.funcs = &dummy_bridge_funcs;
 
@@ -177,10 +178,9 @@ void drm_encoder_cleanup(struct drm_encoder *encoder)
 	 * the indices on the drm_encoder after us in the encoder_list.
 	 */
 
-	for (bridge = &encoder->bridge; bridge; bridge = next) {
-		next = bridge->next;
+	list_for_each_entry_safe(bridge, next, &encoder->bridge_chain,
+				 chain_node)
 		drm_bridge_detach(bridge);
-	}
 
 	drm_mode_object_unregister(dev, &encoder->base);
 	kfree(encoder->name);
