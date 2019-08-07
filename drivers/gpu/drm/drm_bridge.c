@@ -161,6 +161,23 @@ void drm_bridge_detach(struct drm_bridge *bridge)
 }
 
 /**
+ * drm_bridge_chain_get_next_bridge() - Get the next bridge in the chain
+ * @bridge: bridge object
+ *
+ * RETURNS:
+ * the next bridge in the chain, or NULL if @bridge is the last.
+ */
+struct drm_bridge *
+drm_bridge_chain_get_next_bridge(struct drm_bridge *bridge)
+{
+	if (!bridge || !bridge->encoder)
+		return NULL;
+
+	return bridge->next;
+}
+EXPORT_SYMBOL(drm_bridge_chain_get_next_bridge);
+
+/**
  * DOC: bridge callbacks
  *
  * The &drm_bridge_funcs ops are populated by the bridge driver. The DRM
