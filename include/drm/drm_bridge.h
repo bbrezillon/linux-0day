@@ -34,14 +34,32 @@ struct drm_bridge_timings;
 struct drm_panel;
 
 /**
+ * struct drm_bus_cfg - bus configuration
+ * @fmt: format used on this bus
+ * @flags: DRM_BUS_ flags used on this bus
+ *
+ * Encodes the bus format and bus flags used by one end of the bridge or
+ * by the encoder output.
+ */
+struct drm_bus_cfg {
+	u32 fmt;
+	u32 flags;
+};
+
+/**
  * struct drm_bridge_state - Atomic bridge state object
  * @base: inherit from &drm_private_state
  * @bridge: the bridge this state refers to
+ * @input_bus_info: input bus information
+ * @output_bus_info: output bus information
  */
 struct drm_bridge_state {
 	struct drm_private_state base;
 
 	struct drm_bridge *bridge;
+
+	struct drm_bus_cfg input_bus_cfg;
+	struct drm_bus_cfg output_bus_cfg;
 };
 
 static inline struct drm_bridge_state *
@@ -379,6 +397,64 @@ struct drm_bridge_funcs {
 	 */
 	void (*atomic_destroy_state)(struct drm_bridge *bridge,
 				     struct drm_bridge_state *state);
+
+	/**
+	 * @atomic_get_output_bus_fmts:
+	 *
+	 * Return the supported bus formats on the output end of a bridge.
+	 * If output_fmts is NULL, num_output_fmts should be filled with the
+	 * expected output_fmts size. When output_fmts is not NULL, the driver
+	 * should make sure to fill at most num_output_fmts entries of the
+	 * output_fmts array, and update num_output_fmts with the number
+	 * of valid entries.
+	 *
+	 * This method is only called on the last element of the bridge chain
+	 * as part of the bus format negotiation process that happens in
+	 * &drm_atomic_bridge_chain_select_bus_fmts().
+	 * This method is optional. When not implemented, the core will
+	 * fallback to &drm_connector.display_info.bus_formats[0] if
+	 * &drm_connector.display_info.num_bus_formats > 0,
+	 * MEDIA_BUS_FMT_FIXED otherwise.
+	 */
+	void (*atomic_get_output_bus_fmts)(struct drm_bridge *bridge,
+					   struct drm_bridge_state *bridge_state,
+					   struct drm_crtc_state *crtc_state,
+					   struct drm_connector_state *conn_state,
+					   unsigned int *num_output_fmts,
+					   u32 *output_fmts);
+
+	/**
+	 * @atomic_get_input_bus_fmts:
+	 *
+	 * Return the supported bus formats on the input end of a bridge for
+	 * a specific output bus format.
+	 * If input_fmts is NULL, num_input_fmts should be set to the size
+	 * needed to store all supported input bus formats. When input_fmts is
+	 * not NULL, the driver should make sure to fill at most num_input_fmts
+	 * entries of the input_fmts array, and update num_input_fmts with the
+	 * actual number of valid entries.
+	 *
+	 * This method is called on all element of the bridge chain as part of
+	 * the bus format negotiation process that happens in
+	 * &drm_atomic_bridge_chain_select_bus_fmts().
+	 * This method is optional. When not implemented, the core will bypass
+	 * bus format negotiation on this element of the bridge without
+	 * failing, and the previous element in the chain will be passed
+	 * MEDIA_BUS_FMT_FIXED as its output bus format.
+	 *
+	 * Bridge drivers that need to support being linked to bridges that are
+	 * not supporting bus format negotiation should handle the
+	 * output_fmt == MEDIA_BUS_FMT_FIXED appropriately, by selecting a
+	 * sensible default value or extracting the information from somewhere
+	 * else (FW property, &drm_display_mode, &drm_display_info, ...)
+	 */
+	void (*atomic_get_input_bus_fmts)(struct drm_bridge *bridge,
+					  struct drm_bridge_state *bridge_state,
+					  struct drm_crtc_state *crtc_state,
+					  struct drm_connector_state *conn_state,
+					  u32 output_fmt,
+					  unsigned int *num_input_fmts,
+					  u32 *input_fmts);
 
 	/**
 	 * @atomic_check:
