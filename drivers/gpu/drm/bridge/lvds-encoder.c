@@ -6,16 +6,32 @@
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/of_graph.h>
 #include <linux/platform_device.h>
 
 #include <drm/drm_bridge.h>
 #include <drm/drm_panel.h>
 
+struct lvds_encoder_caps {
+	void (*atomic_get_input_bus_fmts)(struct drm_bridge *bridge,
+					  struct drm_bridge_state *bridge_state,
+					  struct drm_crtc_state *crtc_state,
+					  struct drm_connector_state *conn_state,
+					  u32 output_fmt,
+					  unsigned int *num_input_fmts,
+					  u32 *input_fmts);
+	int (*atomic_check)(struct drm_bridge *bridge,
+			    struct drm_bridge_state *bride_state,
+			    struct drm_crtc_state *crtc_state,
+			    struct drm_connector_state *conn_state);
+};
+
 struct lvds_encoder {
 	struct drm_bridge bridge;
 	struct drm_bridge *panel_bridge;
 	struct gpio_desc *powerdown_gpio;
+	const struct lvds_encoder_caps *caps;
 };
 
 static int lvds_encoder_attach(struct drm_bridge *bridge)
@@ -48,10 +64,56 @@ static void lvds_encoder_disable(struct drm_bridge *bridge)
 		gpiod_set_value_cansleep(lvds_encoder->powerdown_gpio, 1);
 }
 
+static void lvds_atomic_get_input_bus_fmts(struct drm_bridge *bridge,
+					   struct drm_bridge_state *bridge_state,
+					   struct drm_crtc_state *crtc_state,
+					   struct drm_connector_state *conn_state,
+					   u32 output_fmt,
+					   unsigned int *num_input_fmts,
+					   u32 *input_fmts)
+{
+	struct lvds_encoder *lvds_encoder = container_of(bridge,
+							 struct lvds_encoder,
+							 bridge);
+
+	if (!lvds_encoder->caps &&
+	    !lvds_encoder->caps->atomic_get_input_bus_fmts) {
+		*num_input_fmts = 1;
+		if (input_fmts)
+			input_fmts[0] = MEDIA_BUS_FMT_FIXED;
+	}
+
+	return lvds_encoder->caps->atomic_get_input_bus_fmts(bridge,
+							     bridge_state,
+							     crtc_state,
+							     conn_state,
+							     output_fmt,
+							     num_input_fmts,
+							     input_fmts);
+}
+
+static int lvds_encoder_atomic_check(struct drm_bridge *bridge,
+				     struct drm_bridge_state *bridge_state,
+				     struct drm_crtc_state *crtc_state,
+				     struct drm_connector_state *conn_state)
+{
+	struct lvds_encoder *lvds_encoder = container_of(bridge,
+							 struct lvds_encoder,
+							 bridge);
+
+	if (!lvds_encoder->caps && !lvds_encoder->caps->atomic_check)
+		return 0;
+
+	return lvds_encoder->caps->atomic_check(bridge, bridge_state,
+						crtc_state, conn_state);
+}
+
 static struct drm_bridge_funcs funcs = {
 	.attach = lvds_encoder_attach,
 	.enable = lvds_encoder_enable,
 	.disable = lvds_encoder_disable,
+	.atomic_get_input_bus_fmts = lvds_atomic_get_input_bus_fmts,
+	.atomic_check = lvds_encoder_atomic_check,
 };
 
 static int lvds_encoder_probe(struct platform_device *pdev)
@@ -67,6 +129,7 @@ static int lvds_encoder_probe(struct platform_device *pdev)
 	if (!lvds_encoder)
 		return -ENOMEM;
 
+	lvds_encoder->caps = of_device_get_match_data(&pdev->dev);
 	lvds_encoder->powerdown_gpio = devm_gpiod_get_optional(dev, "powerdown",
 							       GPIOD_OUT_HIGH);
 	if (IS_ERR(lvds_encoder->powerdown_gpio)) {
