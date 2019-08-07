@@ -280,7 +280,7 @@ struct drm_bridge_funcs {
 	 * The @atomic_pre_enable callback is optional.
 	 */
 	void (*atomic_pre_enable)(struct drm_bridge *bridge,
-				  struct drm_atomic_state *state);
+				  struct drm_bridge_state *state);
 
 	/**
 	 * @atomic_enable:
@@ -305,7 +305,7 @@ struct drm_bridge_funcs {
 	 * The enable callback is optional.
 	 */
 	void (*atomic_enable)(struct drm_bridge *bridge,
-			      struct drm_atomic_state *state);
+			      struct drm_bridge_state *state);
 	/**
 	 * @atomic_disable:
 	 *
@@ -328,7 +328,7 @@ struct drm_bridge_funcs {
 	 * The disable callback is optional.
 	 */
 	void (*atomic_disable)(struct drm_bridge *bridge,
-			       struct drm_atomic_state *state);
+			       struct drm_bridge_state *state);
 
 	/**
 	 * @atomic_post_disable:
@@ -354,7 +354,7 @@ struct drm_bridge_funcs {
 	 * The post_disable callback is optional.
 	 */
 	void (*atomic_post_disable)(struct drm_bridge *bridge,
-				    struct drm_atomic_state *state);
+				    struct drm_bridge_state *state);
 
 	/**
 	 * @atomic_duplicate_state:
