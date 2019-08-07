@@ -92,37 +92,73 @@ static struct drm_encoder *imx_pd_connector_best_encoder(
 	return &imxpd->encoder;
 }
 
-static void imx_pd_encoder_enable(struct drm_encoder *encoder)
+static void imx_pd_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct imx_parallel_display *imxpd = enc_to_imxpd(encoder);
 
 	drm_panel_prepare(imxpd->panel);
 	drm_panel_enable(imxpd->panel);
 }
 
-static void imx_pd_encoder_disable(struct drm_encoder *encoder)
+static void imx_pd_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct imx_parallel_display *imxpd = enc_to_imxpd(encoder);
 
 	drm_panel_disable(imxpd->panel);
 	drm_panel_unprepare(imxpd->panel);
 }
 
-static int imx_pd_encoder_atomic_check(struct drm_encoder *encoder,
-				       struct drm_crtc_state *crtc_state,
-				       struct drm_connector_state *conn_state)
+static int imx_pd_bridge_atomic_check(struct drm_bridge *bridge,
+				      struct drm_bridge_state *bridge_state,
+				      struct drm_crtc_state *crtc_state,
+				      struct drm_connector_state *conn_state)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct imx_crtc_state *imx_crtc_state = to_imx_crtc_state(crtc_state);
 	struct drm_display_info *di = &conn_state->connector->display_info;
 	struct imx_parallel_display *imxpd = enc_to_imxpd(encoder);
+	struct drm_bridge_state *next_bridge_state = NULL;
+	struct drm_bridge *next_bridge;
+	u32 bus_fmt, bus_flags;
+	unsigned int i;
 
-	if (!imxpd->bus_format && di->num_bus_formats) {
-		imx_crtc_state->bus_flags = di->bus_flags;
-		imx_crtc_state->bus_format = di->bus_formats[0];
+	next_bridge = drm_bridge_chain_get_next_bridge(bridge);
+	if (next_bridge)
+		next_bridge_state = drm_atomic_get_new_bridge_state(crtc_state->state,
+								    next_bridge);
+
+	if (next_bridge_state && next_bridge_state->input_bus_cfg.fmt) {
+		bus_flags = next_bridge_state->input_bus_cfg.flags;
+		bus_fmt = next_bridge_state->input_bus_cfg.fmt;
+	} else if (!imxpd->bus_format && di->num_bus_formats) {
+		bus_flags = di->bus_flags;
+		bus_fmt = di->bus_formats[0];
 	} else {
-		imx_crtc_state->bus_flags = imxpd->bus_flags;
-		imx_crtc_state->bus_format = imxpd->bus_format;
+		bus_flags = imxpd->bus_flags;
+		bus_fmt = imxpd->bus_format;
 	}
+
+	for (i = 0; bus_fmt && i < bridge->output_bus_caps.num_supported_fmts;
+	     i++) {
+		if (bridge->output_bus_caps.supported_fmts[i] == bus_fmt)
+			break;
+	}
+
+	if (i == bridge->output_bus_caps.num_supported_fmts)
+		return -EINVAL;
+
+	if (bus_flags &
+	    ~(DRM_BUS_FLAG_DE_LOW | DRM_BUS_FLAG_DE_HIGH |
+	      DRM_BUS_FLAG_PIXDATA_DRIVE_POSEDGE |
+	      DRM_BUS_FLAG_PIXDATA_DRIVE_NEGEDGE))
+		return -EINVAL;
+
+	bridge_state->output_bus_cfg.flags = bus_flags;
+	bridge_state->output_bus_cfg.fmt = bus_fmt;
+	imx_crtc_state->bus_flags = bus_flags;
+	imx_crtc_state->bus_format = bus_fmt;
 	imx_crtc_state->di_hsync_pin = 2;
 	imx_crtc_state->di_vsync_pin = 3;
 
@@ -146,16 +182,24 @@ static const struct drm_encoder_funcs imx_pd_encoder_funcs = {
 	.destroy = imx_drm_encoder_destroy,
 };
 
-static const struct drm_encoder_helper_funcs imx_pd_encoder_helper_funcs = {
-	.enable = imx_pd_encoder_enable,
-	.disable = imx_pd_encoder_disable,
-	.atomic_check = imx_pd_encoder_atomic_check,
+static const struct drm_bridge_funcs imx_pd_bridge_funcs = {
+	.enable = imx_pd_bridge_enable,
+	.disable = imx_pd_bridge_disable,
+	.atomic_check = imx_pd_bridge_atomic_check,
+};
+
+static const u32 imx_pd_bus_fmts[] = {
+	MEDIA_BUS_FMT_RGB888_1X24,
+	MEDIA_BUS_FMT_RGB565_1X16,
+	MEDIA_BUS_FMT_RGB666_1X18,
+	MEDIA_BUS_FMT_RGB666_1X24_CPADHI,
 };
 
 static int imx_pd_register(struct drm_device *drm,
 	struct imx_parallel_display *imxpd)
 {
 	struct drm_encoder *encoder = &imxpd->encoder;
+	struct drm_bus_caps *bus_caps = &encoder->bridge.output_bus_caps;
 	int ret;
 
 	ret = imx_drm_encoder_parse_of(drm, encoder, imxpd->dev->of_node);
@@ -169,9 +213,17 @@ static int imx_pd_register(struct drm_device *drm,
 	 */
 	imxpd->connector.dpms = DRM_MODE_DPMS_OFF;
 
-	drm_encoder_helper_add(encoder, &imx_pd_encoder_helper_funcs);
+	encoder->bridge.funcs = &imx_pd_bridge_funcs;
 	drm_encoder_init(drm, encoder, &imx_pd_encoder_funcs,
 			 DRM_MODE_ENCODER_NONE, NULL);
+
+	if (imxpd->bus_format) {
+		bus_caps->supported_fmts = &imxpd->bus_format;
+		bus_caps->num_supported_fmts = 1;
+	} else {
+		bus_caps->supported_fmts = imx_pd_bus_fmts;
+		bus_caps->num_supported_fmts = ARRAY_SIZE(imx_pd_bus_fmts);
+	}
 
 	if (!imxpd->bridge) {
 		drm_connector_helper_add(&imxpd->connector,
