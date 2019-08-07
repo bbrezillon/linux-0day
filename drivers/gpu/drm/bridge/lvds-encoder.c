@@ -165,9 +165,76 @@ static int lvds_encoder_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int sn75lvds83_atomic_check(struct drm_bridge *bridge,
+				   struct drm_bridge_state *bridge_state,
+				   struct drm_crtc_state *crtc_state,
+				   struct drm_connector_state *conn_state)
+{
+	int ret;
+
+	ret = drm_atomic_bridge_choose_output_bus_cfg(bridge_state, crtc_state,
+						      conn_state);
+	if (ret)
+		return ret;
+
+	/*
+	 * The output bus format has a direct impact on the expected input bus
+	 * format.
+	 */
+	switch (bridge_state->output_bus_cfg.fmt) {
+	case MEDIA_BUS_FMT_RGB888_1X7X4_JEIDA:
+	case MEDIA_BUS_FMT_RGB888_1X7X4_SPWG:
+		/*
+		 * JEIDA and SPWG variants theoretically require different pin
+		 * mapping, but MEDIA_BUS_FMT_ definitions do not allow
+		 * fined-grained pin placement definition, and this is
+		 * something we expect to be taken care of at board design
+		 * time, so let's ignore this for now.
+		 * If it becomes a problem, we can always add a way to override
+		 * the bus format with a FW property.
+		 */
+		bridge_state->input_bus_cfg.fmt = MEDIA_BUS_FMT_RGB888_1X24;
+		break;
+	case MEDIA_BUS_FMT_RGB666_1X7X3_SPWG:
+		bridge_state->input_bus_cfg.fmt = MEDIA_BUS_FMT_RGB666_1X18;
+		break;
+	default:
+		bridge_state->input_bus_cfg.fmt = 0;
+		break;
+	}
+
+	/* Propagate the bus_flags. */
+	bridge_state->input_bus_cfg.flags = bridge_state->output_bus_cfg.flags;
+	return 0;
+}
+
+static const u32 sn75lvds83_output_bus_fmts[] = {
+	MEDIA_BUS_FMT_RGB888_1X7X4_JEIDA,
+	MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+	MEDIA_BUS_FMT_RGB666_1X7X3_SPWG,
+};
+
+static const u32 sn75lvds83_input_bus_fmts[] = {
+	MEDIA_BUS_FMT_RGB888_1X24,
+	MEDIA_BUS_FMT_RGB666_1X18,
+};
+
+static const struct lvds_encoder_caps sn75lvds83_caps = {
+	.output_bus_caps = {
+		.supported_fmts = sn75lvds83_output_bus_fmts,
+		.num_supported_fmts = ARRAY_SIZE(sn75lvds83_output_bus_fmts),
+	},
+	.input_bus_caps = {
+		.supported_fmts = sn75lvds83_input_bus_fmts,
+		.num_supported_fmts = ARRAY_SIZE(sn75lvds83_input_bus_fmts),
+	},
+	.atomic_check = sn75lvds83_atomic_check,
+};
+
 static const struct of_device_id lvds_encoder_match[] = {
 	{ .compatible = "lvds-encoder" },
 	{ .compatible = "thine,thc63lvdm83d" },
+	{ .compatible = "ti,sn75lvds83", .data = &sn75lvds83_caps },
 	{},
 };
 MODULE_DEVICE_TABLE(of, lvds_encoder_match);
