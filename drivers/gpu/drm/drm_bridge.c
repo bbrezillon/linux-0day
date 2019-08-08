@@ -139,8 +139,8 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
 
 	if (previous)
 		previous->next = bridge;
-	else
-		encoder->bridge = bridge;
+	else if (bridge != &encoder->bridge)
+		encoder->bridge.next = bridge;
 
 	return 0;
 }
