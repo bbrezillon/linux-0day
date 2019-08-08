@@ -91,6 +91,9 @@ void drm_encoder_unregister_all(struct drm_device *dev)
 	}
 }
 
+static const struct drm_bridge_funcs dummy_bridge_funcs = {
+};
+
 /**
  * drm_encoder_init - Init a preallocated encoder
  * @dev: drm device
@@ -140,6 +143,13 @@ int drm_encoder_init(struct drm_device *dev,
 		goto out_put;
 	}
 
+	if (!encoder->bridge.funcs)
+		encoder->bridge.funcs = &dummy_bridge_funcs;
+
+	ret = drm_bridge_attach(encoder, &encoder->bridge, NULL);
+	if (ret)
+		goto out_put;
+
 	list_add_tail(&encoder->head, &dev->mode_config.encoder_list);
 	encoder->index = dev->mode_config.num_encoder++;
 
@@ -160,21 +170,16 @@ EXPORT_SYMBOL(drm_encoder_init);
 void drm_encoder_cleanup(struct drm_encoder *encoder)
 {
 	struct drm_device *dev = encoder->dev;
+	struct drm_bridge *bridge, *next;
 
 	/* Note that the encoder_list is considered to be static; should we
 	 * remove the drm_encoder at runtime we would have to decrement all
 	 * the indices on the drm_encoder after us in the encoder_list.
 	 */
 
-	if (encoder->bridge) {
-		struct drm_bridge *bridge = encoder->bridge;
-		struct drm_bridge *next;
-
-		while (bridge) {
-			next = bridge->next;
-			drm_bridge_detach(bridge);
-			bridge = next;
-		}
+	for (bridge = &encoder->bridge; bridge; bridge = next) {
+		next = bridge->next;
+		drm_bridge_detach(bridge);
 	}
 
 	drm_mode_object_unregister(dev, &encoder->base);

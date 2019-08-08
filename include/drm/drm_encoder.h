@@ -25,6 +25,7 @@
 
 #include <linux/list.h>
 #include <linux/ctype.h>
+#include <drm/drm_bridge.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_mode.h>
 #include <drm/drm_mode_object.h>
@@ -89,7 +90,6 @@ struct drm_encoder_funcs {
  * @head: list management
  * @base: base KMS object
  * @name: human readable name, can be overwritten by the driver
- * @bridge: bridge associated to the encoder
  * @funcs: control functions
  * @helper_private: mid-layer private data
  *
@@ -172,12 +172,24 @@ struct drm_encoder {
 	 * &drm_connector_state.crtc.
 	 */
 	struct drm_crtc *crtc;
-	struct drm_bridge *bridge;
+
+	/**
+	 * @bridge: Bridge representing our encoder. Other bridges might be
+	 * linked to this dummy bridge element to form an encoder chain.
+	 */
+	struct drm_bridge bridge;
+
 	const struct drm_encoder_funcs *funcs;
 	const struct drm_encoder_helper_funcs *helper_private;
 };
 
 #define obj_to_encoder(x) container_of(x, struct drm_encoder, base)
+
+static inline struct drm_encoder *
+bridge_to_encoder(struct drm_bridge *bridge)
+{
+	return container_of(bridge, struct drm_encoder, bridge);
+}
 
 __printf(5, 6)
 int drm_encoder_init(struct drm_device *dev,

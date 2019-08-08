@@ -1522,7 +1522,7 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
 	if (out_bridge) {
 		drm_bridge_attach(encoder, out_bridge, NULL);
 		dsi->out_bridge = out_bridge;
-		encoder->bridge = NULL;
+		encoder->bridge.next = NULL;
 	} else {
 		int ret = exynos_dsi_create_connector(encoder);
 
