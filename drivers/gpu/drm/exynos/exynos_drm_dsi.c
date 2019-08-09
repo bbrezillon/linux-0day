@@ -1387,8 +1387,7 @@ static void exynos_dsi_enable(struct drm_encoder *encoder)
 
 	if (dsi->panel) {
 		ret = drm_panel_prepare(dsi->panel);
-		if (ret < 0)
-			goto err_put_sync;
+		WARN_ON(ret && ret != -ENOSYS);
 	} else {
 		drm_bridge_pre_enable(dsi->out_bridge);
 	}
@@ -1398,22 +1397,13 @@ static void exynos_dsi_enable(struct drm_encoder *encoder)
 
 	if (dsi->panel) {
 		ret = drm_panel_enable(dsi->panel);
-		if (ret < 0)
-			goto err_display_disable;
+		WARN_ON(ret && ret != -ENOSYS);
 	} else {
 		drm_bridge_enable(dsi->out_bridge);
 	}
 
 	dsi->state |= DSIM_STATE_VIDOUT_AVAILABLE;
 	return;
-
-err_display_disable:
-	exynos_dsi_set_display_enable(dsi, false);
-	drm_panel_unprepare(dsi->panel);
-
-err_put_sync:
-	dsi->state &= ~DSIM_STATE_ENABLED;
-	pm_runtime_put(dsi->dev);
 }
 
 static void exynos_dsi_disable(struct drm_encoder *encoder)
