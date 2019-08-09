@@ -3337,7 +3337,7 @@ static const struct of_device_id platform_of_match[] = {
 		.data = &tianma_tm070rvhg71,
 	}, {
 		.compatible = "toshiba,lt089ac29000",
-		.data = &toshiba_lt089ac29000,
+		.data = &toshiba_lta089ac29000,
 	}, {
 		.compatible = "toshiba,lta089ac29000",
 		.data = &toshiba_lta089ac29000,
