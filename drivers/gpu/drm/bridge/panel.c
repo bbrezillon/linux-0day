@@ -120,6 +120,23 @@ static void panel_bridge_post_disable(struct drm_bridge *bridge)
 	drm_panel_unprepare(panel_bridge->panel);
 }
 
+static int panel_bridge_atomic_check(struct drm_bridge *bridge,
+				     struct drm_bridge_state *bridge_state,
+				     struct drm_crtc_state *crtc_state,
+				     struct drm_connector_state *conn_state)
+{
+	int ret;
+
+	ret = drm_atomic_bridge_choose_output_bus_cfg(bridge_state, crtc_state,
+						      conn_state);
+	if (ret)
+		return ret;
+
+	bridge_state->input_bus_cfg.fmt = bridge_state->output_bus_cfg.fmt;
+	bridge_state->input_bus_cfg.flags = bridge_state->output_bus_cfg.flags;
+	return 0;
+}
+
 static const struct drm_bridge_funcs panel_bridge_bridge_funcs = {
 	.attach = panel_bridge_attach,
 	.detach = panel_bridge_detach,
@@ -127,6 +144,7 @@ static const struct drm_bridge_funcs panel_bridge_bridge_funcs = {
 	.enable = panel_bridge_enable,
 	.disable = panel_bridge_disable,
 	.post_disable = panel_bridge_post_disable,
+	.atomic_check = panel_bridge_atomic_check,
 };
 
 /**
