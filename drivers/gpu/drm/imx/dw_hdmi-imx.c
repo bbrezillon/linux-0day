@@ -110,12 +110,9 @@ static int dw_hdmi_imx_parse_dt(struct imx_hdmi *hdmi)
 	return 0;
 }
 
-static void dw_hdmi_imx_encoder_disable(struct drm_encoder *encoder)
+static void dw_hdmi_imx_bridge_enable(struct drm_bridge *bridge)
 {
-}
-
-static void dw_hdmi_imx_encoder_enable(struct drm_encoder *encoder)
-{
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct imx_hdmi *hdmi = enc_to_imx_hdmi(encoder);
 	int mux = drm_of_encoder_active_port_id(hdmi->dev->of_node, encoder);
 
@@ -124,7 +121,8 @@ static void dw_hdmi_imx_encoder_enable(struct drm_encoder *encoder)
 			   mux << IMX6Q_GPR3_HDMI_MUX_CTL_SHIFT);
 }
 
-static int dw_hdmi_imx_atomic_check(struct drm_encoder *encoder,
+static int dw_hdmi_imx_atomic_check(struct drm_bridge *bridge,
+				    struct drm_bridge_state *bridge_state,
 				    struct drm_crtc_state *crtc_state,
 				    struct drm_connector_state *conn_state)
 {
@@ -137,9 +135,8 @@ static int dw_hdmi_imx_atomic_check(struct drm_encoder *encoder,
 	return 0;
 }
 
-static const struct drm_encoder_helper_funcs dw_hdmi_imx_encoder_helper_funcs = {
-	.enable     = dw_hdmi_imx_encoder_enable,
-	.disable    = dw_hdmi_imx_encoder_disable,
+static const struct drm_bridge_funcs dw_hdmi_imx_bridge_funcs = {
+	.enable     = dw_hdmi_imx_bridge_enable,
 	.atomic_check = dw_hdmi_imx_atomic_check,
 };
 
@@ -235,7 +232,7 @@ static int dw_hdmi_imx_bind(struct device *dev, struct device *master,
 	if (ret < 0)
 		return ret;
 
-	drm_encoder_helper_add(encoder, &dw_hdmi_imx_encoder_helper_funcs);
+	encoder->bridge.funcs = &dw_hdmi_imx_bridge_funcs;
 	drm_encoder_init(drm, encoder, &dw_hdmi_imx_encoder_funcs,
 			 DRM_MODE_ENCODER_TMDS, NULL);
 

@@ -267,10 +267,11 @@ static struct drm_encoder *imx_tve_connector_best_encoder(
 	return &tve->encoder;
 }
 
-static void imx_tve_encoder_mode_set(struct drm_encoder *encoder,
-				     struct drm_display_mode *orig_mode,
-				     struct drm_display_mode *mode)
+static void imx_tve_bridge_mode_set(struct drm_bridge *bridge,
+				    const struct drm_display_mode *orig_mode,
+				    const struct drm_display_mode *mode)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct imx_tve *tve = enc_to_tve(encoder);
 	unsigned long rounded_rate;
 	unsigned long rate;
@@ -306,25 +307,29 @@ static void imx_tve_encoder_mode_set(struct drm_encoder *encoder,
 		dev_err(tve->dev, "failed to set configuration: %d\n", ret);
 }
 
-static void imx_tve_encoder_enable(struct drm_encoder *encoder)
+static void imx_tve_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct imx_tve *tve = enc_to_tve(encoder);
 
 	tve_enable(tve);
 }
 
-static void imx_tve_encoder_disable(struct drm_encoder *encoder)
+static void imx_tve_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct imx_tve *tve = enc_to_tve(encoder);
 
 	tve_disable(tve);
 }
 
-static int imx_tve_atomic_check(struct drm_encoder *encoder,
+static int imx_tve_atomic_check(struct drm_bridge *bridge,
+				struct drm_bridge_state *bridge_state,
 				struct drm_crtc_state *crtc_state,
 				struct drm_connector_state *conn_state)
 {
 	struct imx_crtc_state *imx_crtc_state = to_imx_crtc_state(crtc_state);
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct imx_tve *tve = enc_to_tve(encoder);
 
 	imx_crtc_state->bus_format = MEDIA_BUS_FMT_GBR888_1X24;
@@ -352,10 +357,10 @@ static const struct drm_encoder_funcs imx_tve_encoder_funcs = {
 	.destroy = imx_drm_encoder_destroy,
 };
 
-static const struct drm_encoder_helper_funcs imx_tve_encoder_helper_funcs = {
-	.mode_set = imx_tve_encoder_mode_set,
-	.enable = imx_tve_encoder_enable,
-	.disable = imx_tve_encoder_disable,
+static const struct drm_bridge_funcs imx_tve_bridge_funcs = {
+	.mode_set = imx_tve_bridge_mode_set,
+	.enable = imx_tve_bridge_enable,
+	.disable = imx_tve_bridge_disable,
 	.atomic_check = imx_tve_atomic_check,
 };
 
@@ -478,7 +483,7 @@ static int imx_tve_register(struct drm_device *drm, struct imx_tve *tve)
 	if (ret)
 		return ret;
 
-	drm_encoder_helper_add(&tve->encoder, &imx_tve_encoder_helper_funcs);
+	tve->encoder.bridge.funcs = &imx_tve_bridge_funcs;
 	drm_encoder_init(drm, &tve->encoder, &imx_tve_encoder_funcs,
 			 encoder_type, NULL);
 

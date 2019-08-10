@@ -194,8 +194,9 @@ static void imx_ldb_set_clock(struct imx_ldb *ldb, int mux, int chno,
 			chno);
 }
 
-static void imx_ldb_encoder_enable(struct drm_encoder *encoder)
+static void imx_ldb_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
 	struct imx_ldb *ldb = imx_ldb_ch->ldb;
 	int dual = ldb->ldb_ctrl & LDB_SPLIT_MODE_EN;
@@ -246,10 +247,12 @@ static void imx_ldb_encoder_enable(struct drm_encoder *encoder)
 }
 
 static void
-imx_ldb_encoder_atomic_mode_set(struct drm_encoder *encoder,
-				struct drm_crtc_state *crtc_state,
-				struct drm_connector_state *connector_state)
+imx_ldb_bridge_atomic_mode_set(struct drm_bridge *bridge,
+			       struct drm_bridge_state *bridge_state,
+			       struct drm_crtc_state *crtc_state,
+			       struct drm_connector_state *connector_state)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
 	struct drm_display_mode *mode = &crtc_state->adjusted_mode;
 	struct imx_ldb *ldb = imx_ldb_ch->ldb;
@@ -302,8 +305,9 @@ imx_ldb_encoder_atomic_mode_set(struct drm_encoder *encoder,
 	imx_ldb_ch_set_bus_format(imx_ldb_ch, bus_format);
 }
 
-static void imx_ldb_encoder_disable(struct drm_encoder *encoder)
+static void imx_ldb_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
 	struct imx_ldb *ldb = imx_ldb_ch->ldb;
 	int mux, ret;
@@ -347,10 +351,12 @@ static void imx_ldb_encoder_disable(struct drm_encoder *encoder)
 	drm_panel_unprepare(imx_ldb_ch->panel);
 }
 
-static int imx_ldb_encoder_atomic_check(struct drm_encoder *encoder,
-					struct drm_crtc_state *crtc_state,
-					struct drm_connector_state *conn_state)
+static int imx_ldb_bridge_atomic_check(struct drm_bridge *bridge,
+				       struct drm_bridge_state *bridge_state,
+				       struct drm_crtc_state *crtc_state,
+				       struct drm_connector_state *conn_state)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct imx_crtc_state *imx_crtc_state = to_imx_crtc_state(crtc_state);
 	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
 	struct drm_display_info *di = &conn_state->connector->display_info;
@@ -400,11 +406,11 @@ static const struct drm_encoder_funcs imx_ldb_encoder_funcs = {
 	.destroy = imx_drm_encoder_destroy,
 };
 
-static const struct drm_encoder_helper_funcs imx_ldb_encoder_helper_funcs = {
-	.atomic_mode_set = imx_ldb_encoder_atomic_mode_set,
-	.enable = imx_ldb_encoder_enable,
-	.disable = imx_ldb_encoder_disable,
-	.atomic_check = imx_ldb_encoder_atomic_check,
+static const struct drm_bridge_funcs imx_ldb_bridge_funcs = {
+	.atomic_mode_set = imx_ldb_bridge_atomic_mode_set,
+	.enable = imx_ldb_bridge_enable,
+	.disable = imx_ldb_bridge_disable,
+	.atomic_check = imx_ldb_bridge_atomic_check,
 };
 
 static int imx_ldb_get_clk(struct imx_ldb *ldb, int chno)
@@ -443,7 +449,7 @@ static int imx_ldb_register(struct drm_device *drm,
 			return ret;
 	}
 
-	drm_encoder_helper_add(encoder, &imx_ldb_encoder_helper_funcs);
+	encoder->bridge.funcs = &imx_ldb_bridge_funcs;
 	drm_encoder_init(drm, encoder, &imx_ldb_encoder_funcs,
 			 DRM_MODE_ENCODER_LVDS, NULL);
 
