@@ -702,35 +702,6 @@ static const struct drm_encoder_funcs ast_enc_funcs = {
 	.destroy = ast_encoder_destroy,
 };
 
-static void ast_encoder_dpms(struct drm_encoder *encoder, int mode)
-{
-
-}
-
-static void ast_encoder_mode_set(struct drm_encoder *encoder,
-			       struct drm_display_mode *mode,
-			       struct drm_display_mode *adjusted_mode)
-{
-}
-
-static void ast_encoder_prepare(struct drm_encoder *encoder)
-{
-
-}
-
-static void ast_encoder_commit(struct drm_encoder *encoder)
-{
-
-}
-
-
-static const struct drm_encoder_helper_funcs ast_enc_helper_funcs = {
-	.dpms = ast_encoder_dpms,
-	.prepare = ast_encoder_prepare,
-	.commit = ast_encoder_commit,
-	.mode_set = ast_encoder_mode_set,
-};
-
 static int ast_encoder_init(struct drm_device *dev)
 {
 	struct ast_encoder *ast_encoder;
@@ -741,7 +712,6 @@ static int ast_encoder_init(struct drm_device *dev)
 
 	drm_encoder_init(dev, &ast_encoder->base, &ast_enc_funcs,
 			 DRM_MODE_ENCODER_DAC, NULL);
-	drm_encoder_helper_add(&ast_encoder->base, &ast_enc_helper_funcs);
 
 	ast_encoder->base.possible_crtcs = 1;
 	return 0;
