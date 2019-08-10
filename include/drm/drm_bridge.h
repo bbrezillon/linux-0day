@@ -599,11 +599,6 @@ drm_atomic_get_new_bridge_state(struct drm_atomic_state *state,
 	return drm_priv_to_bridge_state(obj_state);
 }
 
-int drm_find_best_bus_format(const struct drm_bus_caps *a,
-			     const struct drm_bus_caps *b,
-			     const struct drm_display_mode *mode,
-			     u32 *selected_bus_fmt);
-
 #ifdef CONFIG_DRM_PANEL_BRIDGE
 struct drm_bridge *drm_panel_bridge_add(struct drm_panel *panel,
 					u32 connector_type);

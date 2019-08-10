@@ -600,10 +600,10 @@ void drm_atomic_bridge_chain_enable(struct drm_bridge *bridge,
 }
 EXPORT_SYMBOL(drm_atomic_bridge_chain_enable);
 
-int drm_find_best_bus_format(const struct drm_bus_caps *a,
-			     const struct drm_bus_caps *b,
-			     const struct drm_display_mode *mode,
-			     u32 *selected_bus_fmt)
+static int drm_find_best_bus_format(const struct drm_bus_caps *a,
+				    const struct drm_bus_caps *b,
+				    const struct drm_display_mode *mode,
+				    u32 *selected_bus_fmt)
 {
 	unsigned int i, j;
 
@@ -646,7 +646,6 @@ int drm_find_best_bus_format(const struct drm_bus_caps *a,
 
 	return -EINVAL;
 }
-EXPORT_SYMBOL(drm_find_best_bus_format);
 
 /**
  * drm_atomic_bridge_choose_input_bus_cfg() - Choose bus config for the input
