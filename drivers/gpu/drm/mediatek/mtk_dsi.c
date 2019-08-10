@@ -714,31 +714,27 @@ static const struct drm_encoder_funcs mtk_dsi_encoder_funcs = {
 	.destroy = mtk_dsi_encoder_destroy,
 };
 
-static bool mtk_dsi_encoder_mode_fixup(struct drm_encoder *encoder,
-				       const struct drm_display_mode *mode,
-				       struct drm_display_mode *adjusted_mode)
+static void mtk_dsi_bridge_mode_set(struct drm_bridge *bridge,
+				    const struct drm_display_mode *mode,
+				    const struct drm_display_mode *adjusted)
 {
-	return true;
-}
-
-static void mtk_dsi_encoder_mode_set(struct drm_encoder *encoder,
-				     struct drm_display_mode *mode,
-				     struct drm_display_mode *adjusted)
-{
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct mtk_dsi *dsi = encoder_to_dsi(encoder);
 
 	drm_display_mode_to_videomode(adjusted, &dsi->vm);
 }
 
-static void mtk_dsi_encoder_disable(struct drm_encoder *encoder)
+static void mtk_dsi_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct mtk_dsi *dsi = encoder_to_dsi(encoder);
 
 	mtk_output_dsi_disable(dsi);
 }
 
-static void mtk_dsi_encoder_enable(struct drm_encoder *encoder)
+static void mtk_dsi_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct mtk_dsi *dsi = encoder_to_dsi(encoder);
 
 	mtk_output_dsi_enable(dsi);
@@ -751,11 +747,10 @@ static int mtk_dsi_connector_get_modes(struct drm_connector *connector)
 	return drm_panel_get_modes(dsi->panel);
 }
 
-static const struct drm_encoder_helper_funcs mtk_dsi_encoder_helper_funcs = {
-	.mode_fixup = mtk_dsi_encoder_mode_fixup,
-	.mode_set = mtk_dsi_encoder_mode_set,
-	.disable = mtk_dsi_encoder_disable,
-	.enable = mtk_dsi_encoder_enable,
+static const struct drm_bridge_funcs mtk_dsi_bridge_funcs = {
+	.mode_set = mtk_dsi_bridge_mode_set,
+	.disable = mtk_dsi_bridge_disable,
+	.enable = mtk_dsi_bridge_enable,
 };
 
 static const struct drm_connector_funcs mtk_dsi_connector_funcs = {
@@ -806,13 +801,13 @@ static int mtk_dsi_create_conn_enc(struct drm_device *drm, struct mtk_dsi *dsi)
 {
 	int ret;
 
+	dsi->encoder.bridge.funcs = &mtk_dsi_bridge_funcs;
 	ret = drm_encoder_init(drm, &dsi->encoder, &mtk_dsi_encoder_funcs,
 			       DRM_MODE_ENCODER_DSI, NULL);
 	if (ret) {
 		DRM_ERROR("Failed to encoder init to drm\n");
 		return ret;
 	}
-	drm_encoder_helper_add(&dsi->encoder, &mtk_dsi_encoder_helper_funcs);
 
 	/*
 	 * Currently display data paths are statically assigned to a crtc each.
