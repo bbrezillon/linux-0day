@@ -497,24 +497,39 @@ int shmob_drm_crtc_create(struct shmob_drm_device *sdev)
 #define to_shmob_encoder(e) \
 	container_of(e, struct shmob_drm_encoder, encoder)
 
-static void shmob_drm_encoder_dpms(struct drm_encoder *encoder, int mode)
+static void shmob_drm_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct shmob_drm_encoder *senc = to_shmob_encoder(encoder);
 	struct shmob_drm_device *sdev = encoder->dev->dev_private;
 	struct shmob_drm_connector *scon = &sdev->connector;
 
-	if (senc->dpms == mode)
+	if (senc->dpms == DRM_MODE_DPMS_OFF)
 		return;
 
-	shmob_drm_backlight_dpms(scon, mode);
-
-	senc->dpms = mode;
+	shmob_drm_backlight_dpms(scon, DRM_MODE_DPMS_OFF);
+	senc->dpms = DRM_MODE_DPMS_OFF;
 }
 
-static bool shmob_drm_encoder_mode_fixup(struct drm_encoder *encoder,
-					 const struct drm_display_mode *mode,
-					 struct drm_display_mode *adjusted_mode)
+static void shmob_drm_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
+	struct shmob_drm_encoder *senc = to_shmob_encoder(encoder);
+	struct shmob_drm_device *sdev = encoder->dev->dev_private;
+	struct shmob_drm_connector *scon = &sdev->connector;
+
+	if (senc->dpms == DRM_MODE_DPMS_ON)
+		return;
+
+	shmob_drm_backlight_dpms(scon, DRM_MODE_DPMS_ON);
+	senc->dpms = DRM_MODE_DPMS_ON;
+}
+
+static bool shmob_drm_bridge_mode_fixup(struct drm_bridge *bridge,
+					const struct drm_display_mode *mode,
+					struct drm_display_mode *adjusted_mode)
+{
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct drm_device *dev = encoder->dev;
 	struct shmob_drm_device *sdev = dev->dev_private;
 	struct drm_connector *connector = &sdev->connector.connector;
@@ -533,29 +548,10 @@ static bool shmob_drm_encoder_mode_fixup(struct drm_encoder *encoder,
 	return true;
 }
 
-static void shmob_drm_encoder_mode_prepare(struct drm_encoder *encoder)
-{
-	/* No-op, everything is handled in the CRTC code. */
-}
-
-static void shmob_drm_encoder_mode_set(struct drm_encoder *encoder,
-				       struct drm_display_mode *mode,
-				       struct drm_display_mode *adjusted_mode)
-{
-	/* No-op, everything is handled in the CRTC code. */
-}
-
-static void shmob_drm_encoder_mode_commit(struct drm_encoder *encoder)
-{
-	/* No-op, everything is handled in the CRTC code. */
-}
-
-static const struct drm_encoder_helper_funcs encoder_helper_funcs = {
-	.dpms = shmob_drm_encoder_dpms,
-	.mode_fixup = shmob_drm_encoder_mode_fixup,
-	.prepare = shmob_drm_encoder_mode_prepare,
-	.commit = shmob_drm_encoder_mode_commit,
-	.mode_set = shmob_drm_encoder_mode_set,
+static const struct drm_bridge_funcs bridge_funcs = {
+	.enable = shmob_drm_bridge_enable,
+	.disable = shmob_drm_bridge_disable,
+	.mode_fixup = shmob_drm_bridge_mode_fixup,
 };
 
 static void shmob_drm_encoder_destroy(struct drm_encoder *encoder)
@@ -576,12 +572,11 @@ int shmob_drm_encoder_create(struct shmob_drm_device *sdev)
 
 	encoder->possible_crtcs = 1;
 
+	encoder->bridge.funcs = &bridge_funcs;
 	ret = drm_encoder_init(sdev->ddev, encoder, &encoder_funcs,
 			       DRM_MODE_ENCODER_LVDS, NULL);
 	if (ret < 0)
 		return ret;
-
-	drm_encoder_helper_add(encoder, &encoder_helper_funcs);
 
 	return 0;
 }
