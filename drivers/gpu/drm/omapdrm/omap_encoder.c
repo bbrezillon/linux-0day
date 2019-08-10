@@ -70,9 +70,10 @@ static void omap_encoder_update_videomode_flags(struct videomode *vm,
 	}
 }
 
-static void omap_encoder_hdmi_mode_set(struct drm_connector *connector,
-				       struct drm_encoder *encoder,
-				       struct drm_display_mode *adjusted_mode)
+static void
+omap_encoder_hdmi_mode_set(struct drm_connector *connector,
+			   struct drm_encoder *encoder,
+			   const struct drm_display_mode *adjusted_mode)
 {
 	struct omap_encoder *omap_encoder = to_omap_encoder(encoder);
 	struct omap_dss_device *dssdev = omap_encoder->output;
@@ -94,16 +95,16 @@ static void omap_encoder_hdmi_mode_set(struct drm_connector *connector,
 	}
 }
 
-static void omap_encoder_mode_set(struct drm_encoder *encoder,
-				  struct drm_display_mode *mode,
-				  struct drm_display_mode *adjusted_mode)
+static void omap_bridge_mode_set(struct drm_bridge *bridge,
+				 const struct drm_display_mode *mode,
+				 const struct drm_display_mode *adjusted_mode)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct omap_encoder *omap_encoder = to_omap_encoder(encoder);
 	struct omap_dss_device *output = omap_encoder->output;
 	struct omap_dss_device *dssdev;
 	struct drm_device *dev = encoder->dev;
 	struct drm_connector *connector;
-	struct drm_bridge *bridge;
 	struct videomode vm = { 0 };
 	u32 bus_flags;
 
@@ -151,8 +152,9 @@ static void omap_encoder_mode_set(struct drm_encoder *encoder,
 		omap_encoder_hdmi_mode_set(connector, encoder, adjusted_mode);
 }
 
-static void omap_encoder_disable(struct drm_encoder *encoder)
+static void omap_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct omap_encoder *omap_encoder = to_omap_encoder(encoder);
 	struct omap_dss_device *dssdev = omap_encoder->output;
 	struct drm_device *dev = encoder->dev;
@@ -188,8 +190,9 @@ static void omap_encoder_disable(struct drm_encoder *encoder)
 	omapdss_device_post_disable(dssdev->next);
 }
 
-static void omap_encoder_enable(struct drm_encoder *encoder)
+static void omap_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct omap_encoder *omap_encoder = to_omap_encoder(encoder);
 	struct omap_dss_device *dssdev = omap_encoder->output;
 	struct drm_device *dev = encoder->dev;
@@ -222,10 +225,12 @@ static void omap_encoder_enable(struct drm_encoder *encoder)
 	}
 }
 
-static int omap_encoder_atomic_check(struct drm_encoder *encoder,
-				     struct drm_crtc_state *crtc_state,
-				     struct drm_connector_state *conn_state)
+static int omap_bridge_atomic_check(struct drm_bridge *bridge,
+				    struct drm_bridge_state *bridge_state,
+				    struct drm_crtc_state *crtc_state,
+				    struct drm_connector_state *conn_state)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct omap_encoder *omap_encoder = to_omap_encoder(encoder);
 	enum drm_mode_status status;
 
@@ -240,11 +245,11 @@ static int omap_encoder_atomic_check(struct drm_encoder *encoder,
 	return 0;
 }
 
-static const struct drm_encoder_helper_funcs omap_encoder_helper_funcs = {
-	.mode_set = omap_encoder_mode_set,
-	.disable = omap_encoder_disable,
-	.enable = omap_encoder_enable,
-	.atomic_check = omap_encoder_atomic_check,
+static const struct drm_bridge_funcs omap_bridge_funcs = {
+	.mode_set = omap_bridge_mode_set,
+	.disable = omap_bridge_disable,
+	.enable = omap_bridge_enable,
+	.atomic_check = omap_bridge_atomic_check,
 };
 
 /* initialize encoder */
@@ -262,9 +267,9 @@ struct drm_encoder *omap_encoder_init(struct drm_device *dev,
 
 	encoder = &omap_encoder->base;
 
+	encoder->bridge.funcs = &omap_bridge_funcs;
 	drm_encoder_init(dev, encoder, &omap_encoder_funcs,
 			 DRM_MODE_ENCODER_TMDS, NULL);
-	drm_encoder_helper_add(encoder, &omap_encoder_helper_funcs);
 
 	return encoder;
 
