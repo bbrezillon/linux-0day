@@ -44,8 +44,9 @@ struct zx_vga {
 
 #define to_zx_vga(x) container_of(x, struct zx_vga, x)
 
-static void zx_vga_encoder_enable(struct drm_encoder *encoder)
+static void zx_vga_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct zx_vga *vga = to_zx_vga(encoder);
 	struct zx_vga_pwrctrl *pwrctrl = &vga->pwrctrl;
 
@@ -56,8 +57,9 @@ static void zx_vga_encoder_enable(struct drm_encoder *encoder)
 	vou_inf_enable(VOU_VGA, encoder->crtc);
 }
 
-static void zx_vga_encoder_disable(struct drm_encoder *encoder)
+static void zx_vga_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct zx_vga *vga = to_zx_vga(encoder);
 	struct zx_vga_pwrctrl *pwrctrl = &vga->pwrctrl;
 
@@ -67,9 +69,9 @@ static void zx_vga_encoder_disable(struct drm_encoder *encoder)
 	regmap_update_bits(pwrctrl->regmap, pwrctrl->reg, pwrctrl->mask, 0);
 }
 
-static const struct drm_encoder_helper_funcs zx_vga_encoder_helper_funcs = {
-	.enable	= zx_vga_encoder_enable,
-	.disable = zx_vga_encoder_disable,
+static const struct drm_bridge_funcs zx_vga_bridge_funcs = {
+	.enable	= zx_vga_bridge_enable,
+	.disable = zx_vga_bridge_disable,
 };
 
 static const struct drm_encoder_funcs zx_vga_encoder_funcs = {
@@ -154,14 +156,13 @@ static int zx_vga_register(struct drm_device *drm, struct zx_vga *vga)
 
 	encoder->possible_crtcs = VOU_CRTC_MASK;
 
+	encoder->bridge.funcs = &zx_vga_bridge_funcs;
 	ret = drm_encoder_init(drm, encoder, &zx_vga_encoder_funcs,
 			       DRM_MODE_ENCODER_DAC, NULL);
 	if (ret) {
 		DRM_DEV_ERROR(dev, "failed to init encoder: %d\n", ret);
 		return ret;
 	};
-
-	drm_encoder_helper_add(encoder, &zx_vga_encoder_helper_funcs);
 
 	vga->connector.polled = DRM_CONNECTOR_POLL_HPD;
 

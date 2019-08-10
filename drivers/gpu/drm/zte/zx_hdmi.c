@@ -98,7 +98,7 @@ static int zx_hdmi_infoframe_trans(struct zx_hdmi *hdmi,
 }
 
 static int zx_hdmi_config_video_vsi(struct zx_hdmi *hdmi,
-				    struct drm_display_mode *mode)
+				    const struct drm_display_mode *mode)
 {
 	union hdmi_infoframe frame;
 	int ret;
@@ -116,7 +116,7 @@ static int zx_hdmi_config_video_vsi(struct zx_hdmi *hdmi,
 }
 
 static int zx_hdmi_config_video_avi(struct zx_hdmi *hdmi,
-				    struct drm_display_mode *mode)
+				    const struct drm_display_mode *mode)
 {
 	union hdmi_infoframe frame;
 	int ret;
@@ -136,10 +136,11 @@ static int zx_hdmi_config_video_avi(struct zx_hdmi *hdmi,
 	return zx_hdmi_infoframe_trans(hdmi, &frame, FSEL_AVI);
 }
 
-static void zx_hdmi_encoder_mode_set(struct drm_encoder *encoder,
-				     struct drm_display_mode *mode,
-				     struct drm_display_mode *adj_mode)
+static void zx_hdmi_bridge_mode_set(struct drm_bridge *bridge,
+				    const struct drm_display_mode *mode,
+				    const struct drm_display_mode *adj_mode)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct zx_hdmi *hdmi = to_zx_hdmi(encoder);
 
 	if (hdmi->sink_is_hdmi) {
@@ -222,8 +223,9 @@ static void zx_hdmi_hw_disable(struct zx_hdmi *hdmi)
 	hdmi_writeb_mask(hdmi, CLKPWD, CLKPWD_PDIDCK, 0);
 }
 
-static void zx_hdmi_encoder_enable(struct drm_encoder *encoder)
+static void zx_hdmi_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct zx_hdmi *hdmi = to_zx_hdmi(encoder);
 
 	clk_prepare_enable(hdmi->cec_clk);
@@ -235,8 +237,9 @@ static void zx_hdmi_encoder_enable(struct drm_encoder *encoder)
 	vou_inf_enable(VOU_HDMI, encoder->crtc);
 }
 
-static void zx_hdmi_encoder_disable(struct drm_encoder *encoder)
+static void zx_hdmi_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct zx_hdmi *hdmi = to_zx_hdmi(encoder);
 
 	vou_inf_disable(VOU_HDMI, encoder->crtc);
@@ -248,10 +251,10 @@ static void zx_hdmi_encoder_disable(struct drm_encoder *encoder)
 	clk_disable_unprepare(hdmi->cec_clk);
 }
 
-static const struct drm_encoder_helper_funcs zx_hdmi_encoder_helper_funcs = {
-	.enable	= zx_hdmi_encoder_enable,
-	.disable = zx_hdmi_encoder_disable,
-	.mode_set = zx_hdmi_encoder_mode_set,
+static const struct drm_bridge_funcs zx_hdmi_bridge_funcs = {
+	.enable	= zx_hdmi_bridge_enable,
+	.disable = zx_hdmi_bridge_disable,
+	.mode_set = zx_hdmi_bridge_mode_set,
 };
 
 static const struct drm_encoder_funcs zx_hdmi_encoder_funcs = {
@@ -313,9 +316,9 @@ static int zx_hdmi_register(struct drm_device *drm, struct zx_hdmi *hdmi)
 
 	encoder->possible_crtcs = VOU_CRTC_MASK;
 
+	encoder->bridge.funcs = &zx_hdmi_bridge_funcs;
 	drm_encoder_init(drm, encoder, &zx_hdmi_encoder_funcs,
 			 DRM_MODE_ENCODER_TMDS, NULL);
-	drm_encoder_helper_add(encoder, &zx_hdmi_encoder_helper_funcs);
 
 	hdmi->connector.polled = DRM_CONNECTOR_POLL_HPD;
 

@@ -130,7 +130,7 @@ static const struct zx_tvenc_mode *tvenc_modes[] = {
 };
 
 static const struct zx_tvenc_mode *
-zx_tvenc_find_zmode(struct drm_display_mode *mode)
+zx_tvenc_find_zmode(const struct drm_display_mode *mode)
 {
 	int i;
 
@@ -144,10 +144,11 @@ zx_tvenc_find_zmode(struct drm_display_mode *mode)
 	return NULL;
 }
 
-static void zx_tvenc_encoder_mode_set(struct drm_encoder *encoder,
-				      struct drm_display_mode *mode,
-				      struct drm_display_mode *adj_mode)
+static void zx_tvenc_bridge_mode_set(struct drm_bridge *bridge,
+				     const struct drm_display_mode *mode,
+				     const struct drm_display_mode *adj_mode)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct zx_tvenc *tvenc = to_zx_tvenc(encoder);
 	const struct zx_tvenc_mode *zmode;
 	struct vou_div_config configs[] = {
@@ -185,8 +186,9 @@ static void zx_tvenc_encoder_mode_set(struct drm_encoder *encoder,
 		  zmode->phase_line_incr_cvbs);
 }
 
-static void zx_tvenc_encoder_enable(struct drm_encoder *encoder)
+static void zx_tvenc_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct zx_tvenc *tvenc = to_zx_tvenc(encoder);
 	struct zx_tvenc_pwrctrl *pwrctrl = &tvenc->pwrctrl;
 
@@ -199,8 +201,9 @@ static void zx_tvenc_encoder_enable(struct drm_encoder *encoder)
 	zx_writel(tvenc->mmio + VENC_ENABLE, 1);
 }
 
-static void zx_tvenc_encoder_disable(struct drm_encoder *encoder)
+static void zx_tvenc_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct zx_tvenc *tvenc = to_zx_tvenc(encoder);
 	struct zx_tvenc_pwrctrl *pwrctrl = &tvenc->pwrctrl;
 
@@ -212,10 +215,10 @@ static void zx_tvenc_encoder_disable(struct drm_encoder *encoder)
 	regmap_update_bits(pwrctrl->regmap, pwrctrl->reg, pwrctrl->mask, 0);
 }
 
-static const struct drm_encoder_helper_funcs zx_tvenc_encoder_helper_funcs = {
-	.enable	= zx_tvenc_encoder_enable,
-	.disable = zx_tvenc_encoder_disable,
-	.mode_set = zx_tvenc_encoder_mode_set,
+static const struct drm_bridge_funcs zx_tvenc_bridge_funcs = {
+	.enable	= zx_tvenc_bridge_enable,
+	.disable = zx_tvenc_bridge_disable,
+	.mode_set = zx_tvenc_bridge_mode_set,
 };
 
 static const struct drm_encoder_funcs zx_tvenc_encoder_funcs = {
@@ -285,9 +288,9 @@ static int zx_tvenc_register(struct drm_device *drm, struct zx_tvenc *tvenc)
 	 */
 	encoder->possible_crtcs = BIT(1);
 
+	encoder->bridge.funcs = &zx_tvenc_bridge_funcs;
 	drm_encoder_init(drm, encoder, &zx_tvenc_encoder_funcs,
 			 DRM_MODE_ENCODER_TVDAC, NULL);
-	drm_encoder_helper_add(encoder, &zx_tvenc_encoder_helper_funcs);
 
 	connector->interlace_allowed = true;
 
