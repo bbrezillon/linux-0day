@@ -446,8 +446,9 @@ static void vc4_hdmi_set_infoframes(struct drm_encoder *encoder)
 	vc4_hdmi_set_spd_infoframe(encoder);
 }
 
-static void vc4_hdmi_encoder_disable(struct drm_encoder *encoder)
+static void vc4_hdmi_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct drm_device *dev = encoder->dev;
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 	struct vc4_hdmi *hdmi = vc4->hdmi;
@@ -466,8 +467,9 @@ static void vc4_hdmi_encoder_disable(struct drm_encoder *encoder)
 		DRM_ERROR("Failed to release power domain: %d\n", ret);
 }
 
-static void vc4_hdmi_encoder_enable(struct drm_encoder *encoder)
+static void vc4_hdmi_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct drm_display_mode *mode = &encoder->crtc->state->adjusted_mode;
 	struct vc4_hdmi_encoder *vc4_encoder = to_vc4_hdmi_encoder(encoder);
 	struct drm_device *dev = encoder->dev;
@@ -521,7 +523,7 @@ static void vc4_hdmi_encoder_enable(struct drm_encoder *encoder)
 	HDMI_WRITE(VC4_HDMI_SW_RESET_CONTROL, 0);
 
 	/* PHY should be in reset, like
-	 * vc4_hdmi_encoder_disable() does.
+	 * vc4_hdmi_bridge_disable() does.
 	 */
 	HDMI_WRITE(VC4_HDMI_TX_PHY_RESET_CTL, 0xf << 16);
 
@@ -678,8 +680,8 @@ static void vc4_hdmi_encoder_enable(struct drm_encoder *encoder)
 }
 
 static enum drm_mode_status
-vc4_hdmi_encoder_mode_valid(struct drm_encoder *crtc,
-			    const struct drm_display_mode *mode)
+vc4_hdmi_bridge_mode_valid(struct drm_bridge *bridge,
+			   const struct drm_display_mode *mode)
 {
 	/* HSM clock must be 108% of the pixel clock.  Additionally,
 	 * the AXI clock needs to be at least 25% of pixel clock, but
@@ -691,10 +693,10 @@ vc4_hdmi_encoder_mode_valid(struct drm_encoder *crtc,
 	return MODE_OK;
 }
 
-static const struct drm_encoder_helper_funcs vc4_hdmi_encoder_helper_funcs = {
-	.mode_valid = vc4_hdmi_encoder_mode_valid,
-	.disable = vc4_hdmi_encoder_disable,
-	.enable = vc4_hdmi_encoder_enable,
+static const struct drm_bridge_funcs vc4_hdmi_bridge_funcs = {
+	.mode_valid = vc4_hdmi_bridge_mode_valid,
+	.disable = vc4_hdmi_bridge_disable,
+	.enable = vc4_hdmi_bridge_enable,
 };
 
 /* HDMI audio codec callbacks */
@@ -1391,9 +1393,9 @@ static int vc4_hdmi_bind(struct device *dev, struct device *master, void *data)
 	}
 	pm_runtime_enable(dev);
 
+	hdmi->encoder->bridge.funcs = &vc4_hdmi_bridge_funcs;
 	drm_encoder_init(drm, hdmi->encoder, &vc4_hdmi_encoder_funcs,
 			 DRM_MODE_ENCODER_TMDS, NULL);
-	drm_encoder_helper_add(hdmi->encoder, &vc4_hdmi_encoder_helper_funcs);
 
 	hdmi->connector = vc4_hdmi_connector_init(drm, hdmi->encoder);
 	if (IS_ERR(hdmi->connector)) {

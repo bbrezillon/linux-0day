@@ -378,8 +378,9 @@ static const struct drm_encoder_funcs vc4_vec_encoder_funcs = {
 	.destroy = drm_encoder_cleanup,
 };
 
-static void vc4_vec_encoder_disable(struct drm_encoder *encoder)
+static void vc4_vec_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct vc4_vec_encoder *vc4_vec_encoder = to_vc4_vec_encoder(encoder);
 	struct vc4_vec *vec = vc4_vec_encoder->vec;
 	int ret;
@@ -400,8 +401,9 @@ static void vc4_vec_encoder_disable(struct drm_encoder *encoder)
 	}
 }
 
-static void vc4_vec_encoder_enable(struct drm_encoder *encoder)
+static void vc4_vec_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct vc4_vec_encoder *vc4_vec_encoder = to_vc4_vec_encoder(encoder);
 	struct vc4_vec *vec = vc4_vec_encoder->vec;
 	int ret;
@@ -469,27 +471,22 @@ static void vc4_vec_encoder_enable(struct drm_encoder *encoder)
 	VEC_WRITE(VEC_CFG, VEC_CFG_VEC_EN);
 }
 
-
-static bool vc4_vec_encoder_mode_fixup(struct drm_encoder *encoder,
-				       const struct drm_display_mode *mode,
-				       struct drm_display_mode *adjusted_mode)
-{
-	return true;
-}
-
-static void vc4_vec_encoder_atomic_mode_set(struct drm_encoder *encoder,
+static void vc4_vec_bridge_atomic_mode_set(struct drm_bridge *bridge,
+					struct drm_bridge_state *bridge_state,
 					struct drm_crtc_state *crtc_state,
 					struct drm_connector_state *conn_state)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct vc4_vec_encoder *vc4_vec_encoder = to_vc4_vec_encoder(encoder);
 	struct vc4_vec *vec = vc4_vec_encoder->vec;
 
 	vec->tv_mode = &vc4_vec_tv_modes[conn_state->tv.mode];
 }
 
-static int vc4_vec_encoder_atomic_check(struct drm_encoder *encoder,
-					struct drm_crtc_state *crtc_state,
-					struct drm_connector_state *conn_state)
+static int vc4_vec_bridge_atomic_check(struct drm_bridge *bridge,
+				       struct drm_bridge_state *bridge_state,
+				       struct drm_crtc_state *crtc_state,
+				       struct drm_connector_state *conn_state)
 {
 	const struct vc4_vec_tv_mode *vec_mode;
 
@@ -502,12 +499,11 @@ static int vc4_vec_encoder_atomic_check(struct drm_encoder *encoder,
 	return 0;
 }
 
-static const struct drm_encoder_helper_funcs vc4_vec_encoder_helper_funcs = {
-	.disable = vc4_vec_encoder_disable,
-	.enable = vc4_vec_encoder_enable,
-	.mode_fixup = vc4_vec_encoder_mode_fixup,
-	.atomic_check = vc4_vec_encoder_atomic_check,
-	.atomic_mode_set = vc4_vec_encoder_atomic_mode_set,
+static const struct drm_bridge_funcs vc4_vec_bridge_funcs = {
+	.disable = vc4_vec_bridge_disable,
+	.enable = vc4_vec_bridge_enable,
+	.atomic_check = vc4_vec_bridge_atomic_check,
+	.atomic_mode_set = vc4_vec_bridge_atomic_mode_set,
 };
 
 static const struct of_device_id vc4_vec_dt_match[] = {
@@ -566,9 +562,9 @@ static int vc4_vec_bind(struct device *dev, struct device *master, void *data)
 
 	pm_runtime_enable(dev);
 
+	vec->encoder->bridge.funcs = &vc4_vec_bridge_funcs;
 	drm_encoder_init(drm, vec->encoder, &vc4_vec_encoder_funcs,
 			 DRM_MODE_ENCODER_TVDAC, NULL);
-	drm_encoder_helper_add(vec->encoder, &vc4_vec_encoder_helper_funcs);
 
 	vec->connector = vc4_vec_connector_init(drm, vec);
 	if (IS_ERR(vec->connector)) {

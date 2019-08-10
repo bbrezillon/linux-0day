@@ -333,8 +333,9 @@ static const struct drm_connector_funcs vc4_txp_connector_funcs = {
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 };
 
-static void vc4_txp_encoder_disable(struct drm_encoder *encoder)
+static void vc4_txp_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct vc4_txp *txp = encoder_to_vc4_txp(encoder);
 
 	if (TXP_READ(TXP_DST_CTRL) & TXP_BUSY) {
@@ -352,8 +353,8 @@ static void vc4_txp_encoder_disable(struct drm_encoder *encoder)
 	TXP_WRITE(TXP_DST_CTRL, TXP_POWERDOWN);
 }
 
-static const struct drm_encoder_helper_funcs vc4_txp_encoder_helper_funcs = {
-	.disable = vc4_txp_encoder_disable,
+static const struct drm_bridge_funcs vc4_txp_bridge_funcs = {
+	.disable = vc4_txp_bridge_disable,
 };
 
 static irqreturn_t vc4_txp_interrupt(int irq, void *data)
@@ -394,9 +395,9 @@ static int vc4_txp_bind(struct device *dev, struct device *master, void *data)
 
 	drm_connector_helper_add(&txp->connector.base,
 				 &vc4_txp_connector_helper_funcs);
+	txp->connector.encoder.bridge.funcs = &vc4_txp_bridge_funcs;
 	ret = drm_writeback_connector_init(drm, &txp->connector,
-					   &vc4_txp_connector_funcs,
-					   &vc4_txp_encoder_helper_funcs,
+					   &vc4_txp_connector_funcs, NULL,
 					   drm_fmts, ARRAY_SIZE(drm_fmts));
 	if (ret)
 		return ret;

@@ -118,16 +118,18 @@ static const struct drm_encoder_funcs vc4_dpi_encoder_funcs = {
 	.destroy = drm_encoder_cleanup,
 };
 
-static void vc4_dpi_encoder_disable(struct drm_encoder *encoder)
+static void vc4_dpi_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct vc4_dpi_encoder *vc4_encoder = to_vc4_dpi_encoder(encoder);
 	struct vc4_dpi *dpi = vc4_encoder->dpi;
 
 	clk_disable_unprepare(dpi->pixel_clock);
 }
 
-static void vc4_dpi_encoder_enable(struct drm_encoder *encoder)
+static void vc4_dpi_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct drm_device *dev = encoder->dev;
 	struct drm_display_mode *mode = &encoder->crtc->mode;
 	struct vc4_dpi_encoder *vc4_encoder = to_vc4_dpi_encoder(encoder);
@@ -206,8 +208,9 @@ static void vc4_dpi_encoder_enable(struct drm_encoder *encoder)
 		DRM_ERROR("Failed to set clock rate: %d\n", ret);
 }
 
-static enum drm_mode_status vc4_dpi_encoder_mode_valid(struct drm_encoder *encoder,
-						       const struct drm_display_mode *mode)
+static enum drm_mode_status
+vc4_dpi_bridge_mode_valid(struct drm_bridge *bridge,
+			  const struct drm_display_mode *mode)
 {
 	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
 		return MODE_NO_INTERLACE;
@@ -215,10 +218,10 @@ static enum drm_mode_status vc4_dpi_encoder_mode_valid(struct drm_encoder *encod
 	return MODE_OK;
 }
 
-static const struct drm_encoder_helper_funcs vc4_dpi_encoder_helper_funcs = {
-	.disable = vc4_dpi_encoder_disable,
-	.enable = vc4_dpi_encoder_enable,
-	.mode_valid = vc4_dpi_encoder_mode_valid,
+static const struct drm_bridge_funcs vc4_dpi_bridge_funcs = {
+	.disable = vc4_dpi_bridge_disable,
+	.enable = vc4_dpi_bridge_enable,
+	.mode_valid = vc4_dpi_bridge_mode_valid,
 };
 
 static const struct of_device_id vc4_dpi_dt_match[] = {
@@ -308,9 +311,9 @@ static int vc4_dpi_bind(struct device *dev, struct device *master, void *data)
 	if (ret)
 		DRM_ERROR("Failed to turn on core clock: %d\n", ret);
 
+	dpi->encoder->bridge.funcs = &vc4_dpi_bridge_funcs;
 	drm_encoder_init(drm, dpi->encoder, &vc4_dpi_encoder_funcs,
 			 DRM_MODE_ENCODER_DPI, NULL);
-	drm_encoder_helper_add(dpi->encoder, &vc4_dpi_encoder_helper_funcs);
 
 	ret = vc4_dpi_init_bridge(dpi);
 	if (ret)
