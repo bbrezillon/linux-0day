@@ -375,18 +375,20 @@ static int rk3066_hdmi_setup(struct rk3066_hdmi *hdmi,
 }
 
 static void
-rk3066_hdmi_encoder_mode_set(struct drm_encoder *encoder,
-			     struct drm_display_mode *mode,
-			     struct drm_display_mode *adj_mode)
+rk3066_hdmi_bridge_mode_set(struct drm_bridge *bridge,
+			    const struct drm_display_mode *mode,
+			    const struct drm_display_mode *adj_mode)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct rk3066_hdmi *hdmi = to_rk3066_hdmi(encoder);
 
 	/* Store the display mode for plugin/DPMS poweron events. */
 	memcpy(&hdmi->previous_mode, adj_mode, sizeof(hdmi->previous_mode));
 }
 
-static void rk3066_hdmi_encoder_enable(struct drm_encoder *encoder)
+static void rk3066_hdmi_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct rk3066_hdmi *hdmi = to_rk3066_hdmi(encoder);
 	int mux, val;
 
@@ -404,8 +406,9 @@ static void rk3066_hdmi_encoder_enable(struct drm_encoder *encoder)
 	rk3066_hdmi_setup(hdmi, &hdmi->previous_mode);
 }
 
-static void rk3066_hdmi_encoder_disable(struct drm_encoder *encoder)
+static void rk3066_hdmi_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct rk3066_hdmi *hdmi = to_rk3066_hdmi(encoder);
 
 	DRM_DEV_DEBUG(hdmi->dev, "hdmi encoder disable\n");
@@ -421,18 +424,11 @@ static void rk3066_hdmi_encoder_disable(struct drm_encoder *encoder)
 	rk3066_hdmi_set_power_mode(hdmi, HDMI_SYS_POWER_MODE_A);
 }
 
-static bool
-rk3066_hdmi_encoder_mode_fixup(struct drm_encoder *encoder,
-			       const struct drm_display_mode *mode,
-			       struct drm_display_mode *adj_mode)
-{
-	return true;
-}
-
 static int
-rk3066_hdmi_encoder_atomic_check(struct drm_encoder *encoder,
-				 struct drm_crtc_state *crtc_state,
-				 struct drm_connector_state *conn_state)
+rk3066_hdmi_bridge_atomic_check(struct drm_bridge *bridge,
+				struct drm_bridge_state *bridge_state,
+				struct drm_crtc_state *crtc_state,
+				struct drm_connector_state *conn_state)
 {
 	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
 
@@ -443,12 +439,11 @@ rk3066_hdmi_encoder_atomic_check(struct drm_encoder *encoder,
 }
 
 static const
-struct drm_encoder_helper_funcs rk3066_hdmi_encoder_helper_funcs = {
-	.enable       = rk3066_hdmi_encoder_enable,
-	.disable      = rk3066_hdmi_encoder_disable,
-	.mode_fixup   = rk3066_hdmi_encoder_mode_fixup,
-	.mode_set     = rk3066_hdmi_encoder_mode_set,
-	.atomic_check = rk3066_hdmi_encoder_atomic_check,
+struct drm_bridge_funcs rk3066_hdmi_bridge_funcs = {
+	.enable       = rk3066_hdmi_bridge_enable,
+	.disable      = rk3066_hdmi_bridge_disable,
+	.mode_set     = rk3066_hdmi_bridge_mode_set,
+	.atomic_check = rk3066_hdmi_bridge_atomic_check,
 };
 
 static const struct drm_encoder_funcs rk3066_hdmi_encoder_funcs = {
@@ -556,7 +551,7 @@ rk3066_hdmi_register(struct drm_device *drm, struct rk3066_hdmi *hdmi)
 	if (encoder->possible_crtcs == 0)
 		return -EPROBE_DEFER;
 
-	drm_encoder_helper_add(encoder, &rk3066_hdmi_encoder_helper_funcs);
+	encoder->bridge.funcs = &rk3066_hdmi_bridge_funcs;
 	drm_encoder_init(drm, encoder, &rk3066_hdmi_encoder_funcs,
 			 DRM_MODE_ENCODER_TMDS, NULL);
 

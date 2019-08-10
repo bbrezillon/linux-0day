@@ -585,11 +585,13 @@ static void dw_mipi_dsi_rockchip_config(struct dw_mipi_dsi_rockchip *dsi,
 }
 
 static int
-dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
-				 struct drm_crtc_state *crtc_state,
-				 struct drm_connector_state *conn_state)
+dw_mipi_dsi_bridge_atomic_check(struct drm_bridge *bridge,
+				struct drm_bridge_state *bridge_state,
+				struct drm_crtc_state *crtc_state,
+				struct drm_connector_state *conn_state)
 {
 	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct dw_mipi_dsi_rockchip *dsi = to_dsi(encoder);
 
 	switch (dsi->format) {
@@ -614,8 +616,9 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
 	return 0;
 }
 
-static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+static void dw_mipi_dsi_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct dw_mipi_dsi_rockchip *dsi = to_dsi(encoder);
 	int ret, mux;
 
@@ -646,8 +649,9 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
 	clk_disable_unprepare(dsi->grf_clk);
 }
 
-static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+static void dw_mipi_dsi_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct dw_mipi_dsi_rockchip *dsi = to_dsi(encoder);
 
 	if (dsi->slave)
@@ -655,11 +659,10 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
 	pm_runtime_put(dsi->dev);
 }
 
-static const struct drm_encoder_helper_funcs
-dw_mipi_dsi_encoder_helper_funcs = {
-	.atomic_check = dw_mipi_dsi_encoder_atomic_check,
-	.enable = dw_mipi_dsi_encoder_enable,
-	.disable = dw_mipi_dsi_encoder_disable,
+static const struct drm_bridge_funcs dw_mipi_dsi_bridge_funcs = {
+	.atomic_check = dw_mipi_dsi_bridge_atomic_check,
+	.enable = dw_mipi_dsi_bridge_enable,
+	.disable = dw_mipi_dsi_bridge_disable,
 };
 
 static const struct drm_encoder_funcs dw_mipi_dsi_encoder_funcs = {
@@ -674,6 +677,7 @@ static int rockchip_dsi_drm_create_encoder(struct dw_mipi_dsi_rockchip *dsi,
 
 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm_dev,
 							     dsi->dev->of_node);
+	encoder->bridge.funcs = &dw_mipi_dsi_bridge_funcs;
 
 	ret = drm_encoder_init(drm_dev, encoder, &dw_mipi_dsi_encoder_funcs,
 			       DRM_MODE_ENCODER_DSI, NULL);
@@ -681,8 +685,6 @@ static int rockchip_dsi_drm_create_encoder(struct dw_mipi_dsi_rockchip *dsi,
 		DRM_ERROR("Failed to initialize encoder with drm\n");
 		return ret;
 	}
-
-	drm_encoder_helper_add(encoder, &dw_mipi_dsi_encoder_helper_funcs);
 
 	return 0;
 }

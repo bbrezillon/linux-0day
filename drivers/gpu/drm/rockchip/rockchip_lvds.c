@@ -266,9 +266,10 @@ static int rockchip_lvds_set_vop_source(struct rockchip_lvds *lvds,
 }
 
 static int
-rockchip_lvds_encoder_atomic_check(struct drm_encoder *encoder,
-				   struct drm_crtc_state *crtc_state,
-				   struct drm_connector_state *conn_state)
+rockchip_lvds_bridge_atomic_check(struct drm_bridge *bridge,
+				  struct drm_bridge_state *bridge_state,
+				  struct drm_crtc_state *crtc_state,
+				  struct drm_connector_state *conn_state)
 {
 	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
 
@@ -278,8 +279,9 @@ rockchip_lvds_encoder_atomic_check(struct drm_encoder *encoder,
 	return 0;
 }
 
-static void rockchip_lvds_encoder_enable(struct drm_encoder *encoder)
+static void rockchip_lvds_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct rockchip_lvds *lvds = encoder_to_lvds(encoder);
 	struct drm_display_mode *mode = &encoder->crtc->state->adjusted_mode;
 	int ret;
@@ -295,8 +297,9 @@ static void rockchip_lvds_encoder_enable(struct drm_encoder *encoder)
 	drm_panel_enable(lvds->panel);
 }
 
-static void rockchip_lvds_encoder_disable(struct drm_encoder *encoder)
+static void rockchip_lvds_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct rockchip_lvds *lvds = encoder_to_lvds(encoder);
 
 	drm_panel_disable(lvds->panel);
@@ -305,10 +308,10 @@ static void rockchip_lvds_encoder_disable(struct drm_encoder *encoder)
 }
 
 static const
-struct drm_encoder_helper_funcs rockchip_lvds_encoder_helper_funcs = {
-	.enable = rockchip_lvds_encoder_enable,
-	.disable = rockchip_lvds_encoder_disable,
-	.atomic_check = rockchip_lvds_encoder_atomic_check,
+struct drm_bridge_funcs rockchip_lvds_bridge_funcs = {
+	.enable = rockchip_lvds_bridge_enable,
+	.disable = rockchip_lvds_bridge_disable,
+	.atomic_check = rockchip_lvds_bridge_atomic_check,
 };
 
 static const struct drm_encoder_funcs rockchip_lvds_encoder_funcs = {
@@ -402,6 +405,7 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm_dev,
 							     dev->of_node);
 
+	encoder->bridge.funcs = &rockchip_lvds_bridge_funcs;
 	ret = drm_encoder_init(drm_dev, encoder, &rockchip_lvds_encoder_funcs,
 			       DRM_MODE_ENCODER_LVDS, NULL);
 	if (ret < 0) {
@@ -409,8 +413,6 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
 			      "failed to initialize encoder: %d\n", ret);
 		goto err_put_remote;
 	}
-
-	drm_encoder_helper_add(encoder, &rockchip_lvds_encoder_helper_funcs);
 
 	if (lvds->panel) {
 		connector = &lvds->connector;
@@ -472,7 +474,7 @@ static void rockchip_lvds_unbind(struct device *dev, struct device *master,
 {
 	struct rockchip_lvds *lvds = dev_get_drvdata(dev);
 
-	rockchip_lvds_encoder_disable(&lvds->encoder);
+	rockchip_lvds_bridge_disable(&lvds->encoder.bridge);
 	if (lvds->panel)
 		drm_panel_detach(lvds->panel);
 	pm_runtime_disable(dev);

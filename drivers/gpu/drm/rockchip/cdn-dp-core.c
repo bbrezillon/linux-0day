@@ -537,10 +537,11 @@ err_clk_disable:
 	return ret;
 }
 
-static void cdn_dp_encoder_mode_set(struct drm_encoder *encoder,
-				    struct drm_display_mode *mode,
-				    struct drm_display_mode *adjusted)
+static void cdn_dp_bridge_mode_set(struct drm_bridge *bridge,
+				   const struct drm_display_mode *mode,
+				   const struct drm_display_mode *adjusted)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct cdn_dp_device *dp = encoder_to_dp(encoder);
 	struct drm_display_info *display_info = &dp->connector.display_info;
 	struct video_info *video = &dp->video_info;
@@ -583,8 +584,9 @@ static bool cdn_dp_check_link_status(struct cdn_dp_device *dp)
 	return drm_dp_channel_eq_ok(link_status, min(port->lanes, sink_lanes));
 }
 
-static void cdn_dp_encoder_enable(struct drm_encoder *encoder)
+static void cdn_dp_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct cdn_dp_device *dp = encoder_to_dp(encoder);
 	int ret, val;
 
@@ -642,8 +644,9 @@ out:
 	mutex_unlock(&dp->lock);
 }
 
-static void cdn_dp_encoder_disable(struct drm_encoder *encoder)
+static void cdn_dp_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct cdn_dp_device *dp = encoder_to_dp(encoder);
 	int ret;
 
@@ -670,9 +673,10 @@ static void cdn_dp_encoder_disable(struct drm_encoder *encoder)
 		schedule_work(&dp->event_work);
 }
 
-static int cdn_dp_encoder_atomic_check(struct drm_encoder *encoder,
-				       struct drm_crtc_state *crtc_state,
-				       struct drm_connector_state *conn_state)
+static int cdn_dp_bridge_atomic_check(struct drm_bridge *bridge,
+				      struct drm_bridge_state *bridge_state,
+				      struct drm_crtc_state *crtc_state,
+				      struct drm_connector_state *conn_state)
 {
 	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
 
@@ -682,11 +686,11 @@ static int cdn_dp_encoder_atomic_check(struct drm_encoder *encoder,
 	return 0;
 }
 
-static const struct drm_encoder_helper_funcs cdn_dp_encoder_helper_funcs = {
-	.mode_set = cdn_dp_encoder_mode_set,
-	.enable = cdn_dp_encoder_enable,
-	.disable = cdn_dp_encoder_disable,
-	.atomic_check = cdn_dp_encoder_atomic_check,
+static const struct drm_bridge_funcs cdn_dp_bridge_funcs = {
+	.mode_set = cdn_dp_bridge_mode_set,
+	.enable = cdn_dp_bridge_enable,
+	.disable = cdn_dp_bridge_disable,
+	.atomic_check = cdn_dp_bridge_atomic_check,
 };
 
 static const struct drm_encoder_funcs cdn_dp_encoder_funcs = {
@@ -1030,14 +1034,13 @@ static int cdn_dp_bind(struct device *dev, struct device *master, void *data)
 							     dev->of_node);
 	DRM_DEBUG_KMS("possible_crtcs = 0x%x\n", encoder->possible_crtcs);
 
+	encoder->bridge.funcs = &cdn_dp_bridge_funcs;
 	ret = drm_encoder_init(drm_dev, encoder, &cdn_dp_encoder_funcs,
 			       DRM_MODE_ENCODER_TMDS, NULL);
 	if (ret) {
 		DRM_ERROR("failed to initialize encoder with drm\n");
 		return ret;
 	}
-
-	drm_encoder_helper_add(encoder, &cdn_dp_encoder_helper_funcs);
 
 	connector = &dp->connector;
 	connector->polled = DRM_CONNECTOR_POLL_HPD;
@@ -1093,7 +1096,7 @@ static void cdn_dp_unbind(struct device *dev, struct device *master, void *data)
 	struct drm_connector *connector = &dp->connector;
 
 	cancel_work_sync(&dp->event_work);
-	cdn_dp_encoder_disable(encoder);
+	cdn_dp_bridge_disable(&encoder->bridge);
 	encoder->funcs->destroy(encoder);
 	connector->funcs->destroy(connector);
 

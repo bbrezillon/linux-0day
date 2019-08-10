@@ -128,22 +128,6 @@ static int rockchip_dp_get_modes(struct analogix_dp_plat_data *plat_data,
 	return 0;
 }
 
-static bool
-rockchip_dp_drm_encoder_mode_fixup(struct drm_encoder *encoder,
-				   const struct drm_display_mode *mode,
-				   struct drm_display_mode *adjusted_mode)
-{
-	/* do nothing */
-	return true;
-}
-
-static void rockchip_dp_drm_encoder_mode_set(struct drm_encoder *encoder,
-					     struct drm_display_mode *mode,
-					     struct drm_display_mode *adjusted)
-{
-	/* do nothing */
-}
-
 static
 struct drm_crtc *rockchip_dp_drm_get_new_crtc(struct drm_encoder *encoder,
 					      struct drm_atomic_state *state)
@@ -162,9 +146,11 @@ struct drm_crtc *rockchip_dp_drm_get_new_crtc(struct drm_encoder *encoder,
 	return conn_state->crtc;
 }
 
-static void rockchip_dp_drm_encoder_enable(struct drm_encoder *encoder,
-					   struct drm_atomic_state *state)
+static void rockchip_dp_drm_bridge_enable(struct drm_bridge *bridge,
+					  struct drm_bridge_state *bridge_state)
 {
+	struct drm_atomic_state *state = bridge_state->base.state;
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct rockchip_dp_device *dp = to_dp(encoder);
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *old_crtc_state;
@@ -204,9 +190,11 @@ static void rockchip_dp_drm_encoder_enable(struct drm_encoder *encoder,
 	clk_disable_unprepare(dp->grfclk);
 }
 
-static void rockchip_dp_drm_encoder_disable(struct drm_encoder *encoder,
-					    struct drm_atomic_state *state)
+static void rockchip_dp_drm_bridge_disable(struct drm_bridge *bridge,
+					   struct drm_bridge_state *bridge_state)
 {
+	struct drm_atomic_state *state = bridge_state->base.state;
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct rockchip_dp_device *dp = to_dp(encoder);
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *new_crtc_state = NULL;
@@ -228,9 +216,10 @@ static void rockchip_dp_drm_encoder_disable(struct drm_encoder *encoder,
 }
 
 static int
-rockchip_dp_drm_encoder_atomic_check(struct drm_encoder *encoder,
-				      struct drm_crtc_state *crtc_state,
-				      struct drm_connector_state *conn_state)
+rockchip_dp_drm_bridge_atomic_check(struct drm_bridge *bridge,
+				    struct drm_bridge_state *bridge_state,
+				    struct drm_crtc_state *crtc_state,
+				    struct drm_connector_state *conn_state)
 {
 	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
 	struct drm_display_info *di = &conn_state->connector->display_info;
@@ -250,12 +239,10 @@ rockchip_dp_drm_encoder_atomic_check(struct drm_encoder *encoder,
 	return 0;
 }
 
-static struct drm_encoder_helper_funcs rockchip_dp_encoder_helper_funcs = {
-	.mode_fixup = rockchip_dp_drm_encoder_mode_fixup,
-	.mode_set = rockchip_dp_drm_encoder_mode_set,
-	.atomic_enable = rockchip_dp_drm_encoder_enable,
-	.atomic_disable = rockchip_dp_drm_encoder_disable,
-	.atomic_check = rockchip_dp_drm_encoder_atomic_check,
+static struct drm_bridge_funcs rockchip_dp_bridge_funcs = {
+	.atomic_enable = rockchip_dp_drm_bridge_enable,
+	.atomic_disable = rockchip_dp_drm_bridge_disable,
+	.atomic_check = rockchip_dp_drm_bridge_atomic_check,
 };
 
 static struct drm_encoder_funcs rockchip_dp_encoder_funcs = {
@@ -309,14 +296,13 @@ static int rockchip_dp_drm_create_encoder(struct rockchip_dp_device *dp)
 							     dev->of_node);
 	DRM_DEBUG_KMS("possible_crtcs = 0x%x\n", encoder->possible_crtcs);
 
+	encoder->bridge.funcs = &rockchip_dp_bridge_funcs;
 	ret = drm_encoder_init(drm_dev, encoder, &rockchip_dp_encoder_funcs,
 			       DRM_MODE_ENCODER_TMDS, NULL);
 	if (ret) {
 		DRM_ERROR("failed to initialize encoder with drm\n");
 		return ret;
 	}
-
-	drm_encoder_helper_add(encoder, &rockchip_dp_encoder_helper_funcs);
 
 	return 0;
 }

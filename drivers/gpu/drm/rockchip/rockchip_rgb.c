@@ -29,9 +29,10 @@ struct rockchip_rgb {
 };
 
 static int
-rockchip_rgb_encoder_atomic_check(struct drm_encoder *encoder,
-				   struct drm_crtc_state *crtc_state,
-				   struct drm_connector_state *conn_state)
+rockchip_rgb_bridge_atomic_check(struct drm_bridge *bridge,
+				 struct drm_bridge_state *bridge_state,
+				 struct drm_crtc_state *crtc_state,
+				 struct drm_connector_state *conn_state)
 {
 	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
 	struct drm_connector *connector = conn_state->connector;
@@ -63,8 +64,8 @@ rockchip_rgb_encoder_atomic_check(struct drm_encoder *encoder,
 }
 
 static const
-struct drm_encoder_helper_funcs rockchip_rgb_encoder_helper_funcs = {
-	.atomic_check = rockchip_rgb_encoder_atomic_check,
+struct drm_bridge_funcs rockchip_rgb_bridge_funcs = {
+	.atomic_check = rockchip_rgb_bridge_atomic_check,
 };
 
 static const struct drm_encoder_funcs rockchip_rgb_encoder_funcs = {
@@ -124,6 +125,7 @@ struct rockchip_rgb *rockchip_rgb_init(struct device *dev,
 
 	encoder = &rgb->encoder;
 	encoder->possible_crtcs = drm_crtc_mask(crtc);
+	encoder->bridge.funcs = &rockchip_rgb_bridge_funcs;
 
 	ret = drm_encoder_init(drm_dev, encoder, &rockchip_rgb_encoder_funcs,
 			       DRM_MODE_ENCODER_NONE, NULL);
@@ -132,8 +134,6 @@ struct rockchip_rgb *rockchip_rgb_init(struct device *dev,
 			      "failed to initialize encoder: %d\n", ret);
 		return ERR_PTR(ret);
 	}
-
-	drm_encoder_helper_add(encoder, &rockchip_rgb_encoder_helper_funcs);
 
 	if (panel) {
 		bridge = drm_panel_bridge_add(panel, DRM_MODE_CONNECTOR_LVDS);

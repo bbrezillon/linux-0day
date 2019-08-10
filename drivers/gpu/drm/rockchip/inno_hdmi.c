@@ -267,7 +267,7 @@ static int inno_hdmi_upload_frame(struct inno_hdmi *hdmi, int setup_rc,
 }
 
 static int inno_hdmi_config_video_vsi(struct inno_hdmi *hdmi,
-				      struct drm_display_mode *mode)
+				      const struct drm_display_mode *mode)
 {
 	union hdmi_infoframe frame;
 	int rc;
@@ -281,7 +281,7 @@ static int inno_hdmi_config_video_vsi(struct inno_hdmi *hdmi,
 }
 
 static int inno_hdmi_config_video_avi(struct inno_hdmi *hdmi,
-				      struct drm_display_mode *mode)
+				      const struct drm_display_mode *mode)
 {
 	union hdmi_infoframe frame;
 	int rc;
@@ -378,7 +378,7 @@ static int inno_hdmi_config_video_csc(struct inno_hdmi *hdmi)
 }
 
 static int inno_hdmi_config_video_timing(struct inno_hdmi *hdmi,
-					 struct drm_display_mode *mode)
+					 const struct drm_display_mode *mode)
 {
 	int value;
 
@@ -430,7 +430,7 @@ static int inno_hdmi_config_video_timing(struct inno_hdmi *hdmi,
 }
 
 static int inno_hdmi_setup(struct inno_hdmi *hdmi,
-			   struct drm_display_mode *mode)
+			   const struct drm_display_mode *mode)
 {
 	hdmi->hdmi_data.vic = drm_match_cea_mode(mode);
 
@@ -478,10 +478,11 @@ static int inno_hdmi_setup(struct inno_hdmi *hdmi,
 	return 0;
 }
 
-static void inno_hdmi_encoder_mode_set(struct drm_encoder *encoder,
-				       struct drm_display_mode *mode,
-				       struct drm_display_mode *adj_mode)
+static void inno_hdmi_bridge_mode_set(struct drm_bridge *bridge,
+				      const struct drm_display_mode *mode,
+				      const struct drm_display_mode *adj_mode)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct inno_hdmi *hdmi = to_inno_hdmi(encoder);
 
 	inno_hdmi_setup(hdmi, adj_mode);
@@ -490,31 +491,27 @@ static void inno_hdmi_encoder_mode_set(struct drm_encoder *encoder,
 	memcpy(&hdmi->previous_mode, adj_mode, sizeof(hdmi->previous_mode));
 }
 
-static void inno_hdmi_encoder_enable(struct drm_encoder *encoder)
+static void inno_hdmi_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct inno_hdmi *hdmi = to_inno_hdmi(encoder);
 
 	inno_hdmi_set_pwr_mode(hdmi, NORMAL);
 }
 
-static void inno_hdmi_encoder_disable(struct drm_encoder *encoder)
+static void inno_hdmi_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct inno_hdmi *hdmi = to_inno_hdmi(encoder);
 
 	inno_hdmi_set_pwr_mode(hdmi, LOWER_PWR);
 }
 
-static bool inno_hdmi_encoder_mode_fixup(struct drm_encoder *encoder,
-					 const struct drm_display_mode *mode,
-					 struct drm_display_mode *adj_mode)
-{
-	return true;
-}
-
 static int
-inno_hdmi_encoder_atomic_check(struct drm_encoder *encoder,
-			       struct drm_crtc_state *crtc_state,
-			       struct drm_connector_state *conn_state)
+inno_hdmi_bridge_atomic_check(struct drm_bridge *bridge,
+			      struct drm_bridge_state *bridge_state,
+			      struct drm_crtc_state *crtc_state,
+			      struct drm_connector_state *conn_state)
 {
 	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
 
@@ -524,12 +521,11 @@ inno_hdmi_encoder_atomic_check(struct drm_encoder *encoder,
 	return 0;
 }
 
-static struct drm_encoder_helper_funcs inno_hdmi_encoder_helper_funcs = {
-	.enable     = inno_hdmi_encoder_enable,
-	.disable    = inno_hdmi_encoder_disable,
-	.mode_fixup = inno_hdmi_encoder_mode_fixup,
-	.mode_set   = inno_hdmi_encoder_mode_set,
-	.atomic_check = inno_hdmi_encoder_atomic_check,
+static struct drm_bridge_funcs inno_hdmi_bridge_funcs = {
+	.enable     = inno_hdmi_bridge_enable,
+	.disable    = inno_hdmi_bridge_disable,
+	.mode_set   = inno_hdmi_bridge_mode_set,
+	.atomic_check = inno_hdmi_bridge_atomic_check,
 };
 
 static struct drm_encoder_funcs inno_hdmi_encoder_funcs = {
@@ -616,7 +612,7 @@ static int inno_hdmi_register(struct drm_device *drm, struct inno_hdmi *hdmi)
 	if (encoder->possible_crtcs == 0)
 		return -EPROBE_DEFER;
 
-	drm_encoder_helper_add(encoder, &inno_hdmi_encoder_helper_funcs);
+	encoder->bridge.funcs = &inno_hdmi_bridge_funcs;
 	drm_encoder_init(drm, encoder, &inno_hdmi_encoder_funcs,
 			 DRM_MODE_ENCODER_TMDS, NULL);
 
