@@ -1461,25 +1461,6 @@ static void mga_crtc_init(struct mga_device *mdev)
  * These functions are analagous to those in the CRTC code, but are intended
  * to handle any encoder-specific limitations
  */
-static void mga_encoder_mode_set(struct drm_encoder *encoder,
-				struct drm_display_mode *mode,
-				struct drm_display_mode *adjusted_mode)
-{
-
-}
-
-static void mga_encoder_dpms(struct drm_encoder *encoder, int state)
-{
-	return;
-}
-
-static void mga_encoder_prepare(struct drm_encoder *encoder)
-{
-}
-
-static void mga_encoder_commit(struct drm_encoder *encoder)
-{
-}
 
 static void mga_encoder_destroy(struct drm_encoder *encoder)
 {
@@ -1487,13 +1468,6 @@ static void mga_encoder_destroy(struct drm_encoder *encoder)
 	drm_encoder_cleanup(encoder);
 	kfree(mga_encoder);
 }
-
-static const struct drm_encoder_helper_funcs mga_encoder_helper_funcs = {
-	.dpms = mga_encoder_dpms,
-	.mode_set = mga_encoder_mode_set,
-	.prepare = mga_encoder_prepare,
-	.commit = mga_encoder_commit,
-};
 
 static const struct drm_encoder_funcs mga_encoder_encoder_funcs = {
 	.destroy = mga_encoder_destroy,
@@ -1513,7 +1487,6 @@ static struct drm_encoder *mga_encoder_init(struct drm_device *dev)
 
 	drm_encoder_init(dev, encoder, &mga_encoder_encoder_funcs,
 			 DRM_MODE_ENCODER_DAC, NULL);
-	drm_encoder_helper_add(encoder, &mga_encoder_helper_funcs);
 
 	return encoder;
 }
