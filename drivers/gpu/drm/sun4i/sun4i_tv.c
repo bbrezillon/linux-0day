@@ -338,8 +338,9 @@ static void sun4i_tv_mode_to_drm_mode(const struct tv_mode *tv_mode,
 	mode->vtotal = mode->vsync_end  + tv_mode->vback_porch;
 }
 
-static void sun4i_tv_disable(struct drm_encoder *encoder)
+static void sun4i_tv_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
 	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
 
@@ -352,8 +353,9 @@ static void sun4i_tv_disable(struct drm_encoder *encoder)
 	sunxi_engine_disable_color_correction(crtc->engine);
 }
 
-static void sun4i_tv_enable(struct drm_encoder *encoder)
+static void sun4i_tv_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
 	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
 
@@ -366,10 +368,11 @@ static void sun4i_tv_enable(struct drm_encoder *encoder)
 			   SUN4I_TVE_EN_ENABLE);
 }
 
-static void sun4i_tv_mode_set(struct drm_encoder *encoder,
-			      struct drm_display_mode *mode,
-			      struct drm_display_mode *adjusted_mode)
+static void sun4i_tv_mode_set(struct drm_bridge *bridge,
+			      const struct drm_display_mode *mode,
+			      const struct drm_display_mode *adjusted_mode)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
 	const struct tv_mode *tv_mode = sun4i_tv_find_tv_by_mode(mode);
 
@@ -467,7 +470,7 @@ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
 	regmap_write(tv->regs, SUN4I_TVE_SLAVE_REG, 0);
 }
 
-static struct drm_encoder_helper_funcs sun4i_tv_helper_funcs = {
+static struct drm_bridge_funcs sun4i_tv_bridge_funcs = {
 	.disable	= sun4i_tv_disable,
 	.enable		= sun4i_tv_enable,
 	.mode_set	= sun4i_tv_mode_set,
@@ -590,8 +593,7 @@ static int sun4i_tv_bind(struct device *dev, struct device *master,
 	}
 	clk_prepare_enable(tv->clk);
 
-	drm_encoder_helper_add(&tv->encoder,
-			       &sun4i_tv_helper_funcs);
+	tv->encoder.bridge.funcs = &sun4i_tv_bridge_funcs;
 	ret = drm_encoder_init(drm,
 			       &tv->encoder,
 			       &sun4i_tv_funcs,

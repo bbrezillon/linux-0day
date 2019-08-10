@@ -68,7 +68,8 @@ static int sun4i_hdmi_setup_avi_infoframes(struct sun4i_hdmi *hdmi,
 	return 0;
 }
 
-static int sun4i_hdmi_atomic_check(struct drm_encoder *encoder,
+static int sun4i_hdmi_atomic_check(struct drm_bridge *bridge,
+				   struct drm_bridge_state *state,
 				   struct drm_crtc_state *crtc_state,
 				   struct drm_connector_state *conn_state)
 {
@@ -80,8 +81,9 @@ static int sun4i_hdmi_atomic_check(struct drm_encoder *encoder,
 	return 0;
 }
 
-static void sun4i_hdmi_disable(struct drm_encoder *encoder)
+static void sun4i_hdmi_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
 	u32 val;
 
@@ -94,8 +96,9 @@ static void sun4i_hdmi_disable(struct drm_encoder *encoder)
 	clk_disable_unprepare(hdmi->tmds_clk);
 }
 
-static void sun4i_hdmi_enable(struct drm_encoder *encoder)
+static void sun4i_hdmi_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct drm_display_mode *mode = &encoder->crtc->state->adjusted_mode;
 	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
 	u32 val = 0;
@@ -116,10 +119,11 @@ static void sun4i_hdmi_enable(struct drm_encoder *encoder)
 	writel(val, hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
 }
 
-static void sun4i_hdmi_mode_set(struct drm_encoder *encoder,
-				struct drm_display_mode *mode,
-				struct drm_display_mode *adjusted_mode)
+static void sun4i_hdmi_mode_set(struct drm_bridge *bridge,
+				const struct drm_display_mode *mode,
+				const struct drm_display_mode *adjusted_mode)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
 	unsigned int x, y;
 	u32 val;
@@ -177,9 +181,11 @@ static void sun4i_hdmi_mode_set(struct drm_encoder *encoder,
 	writel(val, hdmi->base + SUN4I_HDMI_VID_TIMING_POL_REG);
 }
 
-static enum drm_mode_status sun4i_hdmi_mode_valid(struct drm_encoder *encoder,
-					const struct drm_display_mode *mode)
+static enum drm_mode_status
+sun4i_hdmi_mode_valid(struct drm_bridge *bridge,
+		      const struct drm_display_mode *mode)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
 	unsigned long rate = mode->clock * 1000;
 	unsigned long diff = rate / 200; /* +-0.5% allowed by HDMI spec */
@@ -196,7 +202,7 @@ static enum drm_mode_status sun4i_hdmi_mode_valid(struct drm_encoder *encoder,
 	return MODE_NOCLOCK;
 }
 
-static const struct drm_encoder_helper_funcs sun4i_hdmi_helper_funcs = {
+static const struct drm_bridge_funcs sun4i_hdmi_bridge_funcs = {
 	.atomic_check	= sun4i_hdmi_atomic_check,
 	.disable	= sun4i_hdmi_disable,
 	.enable		= sun4i_hdmi_enable,
@@ -608,8 +614,7 @@ static int sun4i_hdmi_bind(struct device *dev, struct device *master,
 			goto err_del_i2c_adapter;
 	}
 
-	drm_encoder_helper_add(&hdmi->encoder,
-			       &sun4i_hdmi_helper_funcs);
+	hdmi->encoder.bridge.funcs = &sun4i_hdmi_bridge_funcs;
 	ret = drm_encoder_init(drm,
 			       &hdmi->encoder,
 			       &sun4i_hdmi_funcs,

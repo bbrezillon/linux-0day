@@ -58,10 +58,12 @@ static int sun4i_rgb_get_modes(struct drm_connector *connector)
  */
 #define SUN4I_RGB_DOTCLOCK_TOLERANCE_PER_MILLE	5
 
-static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
-						 const struct drm_display_mode *mode)
+static enum drm_mode_status
+sun4i_rgb_bridge_mode_valid(struct drm_bridge *bridge,
+			    const struct drm_display_mode *mode)
 {
-	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(crtc);
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
+	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
 	struct sun4i_tcon *tcon = rgb->tcon;
 	u32 hsync = mode->hsync_end - mode->hsync_start;
 	u32 vsync = mode->vsync_end - mode->vsync_start;
@@ -158,8 +160,9 @@ static const struct drm_connector_funcs sun4i_rgb_con_funcs = {
 	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
 };
 
-static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+static void sun4i_rgb_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
 
 	DRM_DEBUG_DRIVER("Enabling RGB output\n");
@@ -170,8 +173,9 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
 	}
 }
 
-static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+static void sun4i_rgb_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
 
 	DRM_DEBUG_DRIVER("Disabling RGB output\n");
@@ -182,10 +186,10 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
 	}
 }
 
-static struct drm_encoder_helper_funcs sun4i_rgb_enc_helper_funcs = {
-	.disable	= sun4i_rgb_encoder_disable,
-	.enable		= sun4i_rgb_encoder_enable,
-	.mode_valid	= sun4i_rgb_mode_valid,
+static struct drm_bridge_funcs sun4i_rgb_bridge_funcs = {
+	.disable	= sun4i_rgb_bridge_disable,
+	.enable		= sun4i_rgb_bridge_enable,
+	.mode_valid	= sun4i_rgb_bridge_mode_valid,
 };
 
 static void sun4i_rgb_enc_destroy(struct drm_encoder *encoder)
@@ -216,8 +220,7 @@ int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
 		return 0;
 	}
 
-	drm_encoder_helper_add(&rgb->encoder,
-			       &sun4i_rgb_enc_helper_funcs);
+	rgb->encoder.bridge.funcs = &sun4i_rgb_bridge_funcs;
 	ret = drm_encoder_init(drm,
 			       &rgb->encoder,
 			       &sun4i_rgb_enc_funcs,

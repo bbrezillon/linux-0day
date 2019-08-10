@@ -14,19 +14,19 @@
 #include "sun8i_dw_hdmi.h"
 #include "sun8i_tcon_top.h"
 
-static void sun8i_dw_hdmi_encoder_mode_set(struct drm_encoder *encoder,
-					   struct drm_display_mode *mode,
-					   struct drm_display_mode *adj_mode)
+static void sun8i_dw_hdmi_bridge_mode_set(struct drm_bridge *bridge,
+					  const struct drm_display_mode *mode,
+					  const struct drm_display_mode *adj_mode)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sun8i_dw_hdmi *hdmi = encoder_to_sun8i_dw_hdmi(encoder);
 
 	if (hdmi->quirks->set_rate)
 		clk_set_rate(hdmi->clk_tmds, mode->crtc_clock * 1000);
 }
 
-static const struct drm_encoder_helper_funcs
-sun8i_dw_hdmi_encoder_helper_funcs = {
-	.mode_set = sun8i_dw_hdmi_encoder_mode_set,
+static const struct drm_bridge_funcs sun8i_dw_hdmi_bridge_funcs = {
+	.mode_set = sun8i_dw_hdmi_bridge_mode_set,
 };
 
 static const struct drm_encoder_funcs sun8i_dw_hdmi_encoder_funcs = {
@@ -181,7 +181,7 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
 		goto err_disable_clk_tmds;
 	}
 
-	drm_encoder_helper_add(encoder, &sun8i_dw_hdmi_encoder_helper_funcs);
+	encoder->bridge.funcs = &sun8i_dw_hdmi_bridge_funcs;
 	drm_encoder_init(drm, encoder, &sun8i_dw_hdmi_encoder_funcs,
 			 DRM_MODE_ENCODER_TMDS, NULL);
 

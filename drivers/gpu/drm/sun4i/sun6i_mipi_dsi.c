@@ -713,8 +713,9 @@ static int sun6i_dsi_start(struct sun6i_dsi *dsi,
 	return 0;
 }
 
-static void sun6i_dsi_encoder_enable(struct drm_encoder *encoder)
+static void sun6i_dsi_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct drm_display_mode *mode = &encoder->crtc->state->adjusted_mode;
 	struct sun6i_dsi *dsi = encoder_to_sun6i_dsi(encoder);
 	struct mipi_dsi_device *device = dsi->device;
@@ -773,8 +774,9 @@ static void sun6i_dsi_encoder_enable(struct drm_encoder *encoder)
 	sun6i_dsi_start(dsi, DSI_START_HSD);
 }
 
-static void sun6i_dsi_encoder_disable(struct drm_encoder *encoder)
+static void sun6i_dsi_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sun6i_dsi *dsi = encoder_to_sun6i_dsi(encoder);
 
 	DRM_DEBUG_DRIVER("Disabling DSI output\n");
@@ -816,9 +818,9 @@ static const struct drm_connector_funcs sun6i_dsi_connector_funcs = {
 	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
 };
 
-static const struct drm_encoder_helper_funcs sun6i_dsi_enc_helper_funcs = {
-	.disable	= sun6i_dsi_encoder_disable,
-	.enable		= sun6i_dsi_encoder_enable,
+static const struct drm_bridge_funcs sun6i_dsi_bridge_funcs = {
+	.disable	= sun6i_dsi_bridge_disable,
+	.enable		= sun6i_dsi_bridge_enable,
 };
 
 static const struct drm_encoder_funcs sun6i_dsi_enc_funcs = {
@@ -1029,8 +1031,7 @@ static int sun6i_dsi_bind(struct device *dev, struct device *master,
 
 	dsi->drv = drv;
 
-	drm_encoder_helper_add(&dsi->encoder,
-			       &sun6i_dsi_enc_helper_funcs);
+	dsi->encoder.bridge.funcs = &sun6i_dsi_bridge_funcs;
 	ret = drm_encoder_init(drm,
 			       &dsi->encoder,
 			       &sun6i_dsi_enc_funcs,

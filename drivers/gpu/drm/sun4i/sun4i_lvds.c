@@ -67,8 +67,9 @@ static const struct drm_connector_funcs sun4i_lvds_con_funcs = {
 	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
 };
 
-static void sun4i_lvds_encoder_enable(struct drm_encoder *encoder)
+static void sun4i_lvds_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sun4i_lvds *lvds = drm_encoder_to_sun4i_lvds(encoder);
 
 	DRM_DEBUG_DRIVER("Enabling LVDS output\n");
@@ -79,8 +80,9 @@ static void sun4i_lvds_encoder_enable(struct drm_encoder *encoder)
 	}
 }
 
-static void sun4i_lvds_encoder_disable(struct drm_encoder *encoder)
+static void sun4i_lvds_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sun4i_lvds *lvds = drm_encoder_to_sun4i_lvds(encoder);
 
 	DRM_DEBUG_DRIVER("Disabling LVDS output\n");
@@ -91,9 +93,9 @@ static void sun4i_lvds_encoder_disable(struct drm_encoder *encoder)
 	}
 }
 
-static const struct drm_encoder_helper_funcs sun4i_lvds_enc_helper_funcs = {
-	.disable	= sun4i_lvds_encoder_disable,
-	.enable		= sun4i_lvds_encoder_enable,
+static const struct drm_bridge_funcs sun4i_lvds_bridge_funcs = {
+	.disable	= sun4i_lvds_bridge_disable,
+	.enable		= sun4i_lvds_bridge_enable,
 };
 
 static const struct drm_encoder_funcs sun4i_lvds_enc_funcs = {
@@ -119,8 +121,7 @@ int sun4i_lvds_init(struct drm_device *drm, struct sun4i_tcon *tcon)
 		return 0;
 	}
 
-	drm_encoder_helper_add(&lvds->encoder,
-			       &sun4i_lvds_enc_helper_funcs);
+	lvds->encoder.bridge.funcs = &sun4i_lvds_bridge_funcs;
 	ret = drm_encoder_init(drm,
 			       &lvds->encoder,
 			       &sun4i_lvds_enc_funcs,
