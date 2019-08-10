@@ -568,8 +568,9 @@ static void dsi_mipi_init(struct dw_dsi *dsi)
 			 dsi->lanes, mode->clock, phy->lane_byte_clk_kHz);
 }
 
-static void dsi_encoder_disable(struct drm_encoder *encoder)
+static void dsi_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct dw_dsi *dsi = encoder_to_dsi(encoder);
 	struct dsi_hw_ctx *ctx = dsi->ctx;
 	void __iomem *base = ctx->base;
@@ -585,8 +586,9 @@ static void dsi_encoder_disable(struct drm_encoder *encoder)
 	dsi->enable = false;
 }
 
-static void dsi_encoder_enable(struct drm_encoder *encoder)
+static void dsi_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct dw_dsi *dsi = encoder_to_dsi(encoder);
 	struct dsi_hw_ctx *ctx = dsi->ctx;
 	int ret;
@@ -637,10 +639,12 @@ static enum drm_mode_status dsi_encoder_phy_mode_valid(
 	return MODE_BAD;
 }
 
-static enum drm_mode_status dsi_encoder_mode_valid(struct drm_encoder *encoder,
-					const struct drm_display_mode *mode)
+static enum drm_mode_status
+dsi_bridge_mode_valid(struct drm_bridge *bridge,
+		      const struct drm_display_mode *mode)
 
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	const struct drm_crtc_helper_funcs *crtc_funcs = NULL;
 	struct drm_crtc *crtc = NULL;
 	struct drm_display_mode adj_mode;
@@ -671,29 +675,21 @@ static enum drm_mode_status dsi_encoder_mode_valid(struct drm_encoder *encoder,
 	return MODE_OK;
 }
 
-static void dsi_encoder_mode_set(struct drm_encoder *encoder,
-				 struct drm_display_mode *mode,
-				 struct drm_display_mode *adj_mode)
+static void dsi_bridge_mode_set(struct drm_bridge *bridge,
+				const struct drm_display_mode *mode,
+				const struct drm_display_mode *adj_mode)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct dw_dsi *dsi = encoder_to_dsi(encoder);
 
 	drm_mode_copy(&dsi->cur_mode, adj_mode);
 }
 
-static int dsi_encoder_atomic_check(struct drm_encoder *encoder,
-				    struct drm_crtc_state *crtc_state,
-				    struct drm_connector_state *conn_state)
-{
-	/* do nothing */
-	return 0;
-}
-
-static const struct drm_encoder_helper_funcs dw_encoder_helper_funcs = {
-	.atomic_check	= dsi_encoder_atomic_check,
-	.mode_valid	= dsi_encoder_mode_valid,
-	.mode_set	= dsi_encoder_mode_set,
-	.enable		= dsi_encoder_enable,
-	.disable	= dsi_encoder_disable
+static const struct drm_bridge_funcs dw_bridge_funcs = {
+	.mode_valid	= dsi_bridge_mode_valid,
+	.mode_set	= dsi_bridge_mode_set,
+	.enable		= dsi_bridge_enable,
+	.disable	= dsi_bridge_disable
 };
 
 static const struct drm_encoder_funcs dw_encoder_funcs = {
@@ -713,14 +709,13 @@ static int dw_drm_encoder_init(struct device *dev,
 	}
 
 	encoder->possible_crtcs = crtc_mask;
+	encoder->bridge.funcs = &dw_bridge_funcs;
 	ret = drm_encoder_init(drm_dev, encoder, &dw_encoder_funcs,
 			       DRM_MODE_ENCODER_DSI, NULL);
 	if (ret) {
 		DRM_ERROR("failed to init dsi encoder\n");
 		return ret;
 	}
-
-	drm_encoder_helper_add(encoder, &dw_encoder_helper_funcs);
 
 	return 0;
 }

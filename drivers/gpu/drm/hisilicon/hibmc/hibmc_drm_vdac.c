@@ -69,12 +69,12 @@ hibmc_connector_init(struct hibmc_drm_private *priv)
 	return connector;
 }
 
-static void hibmc_encoder_mode_set(struct drm_encoder *encoder,
-				   struct drm_display_mode *mode,
-				   struct drm_display_mode *adj_mode)
+static void hibmc_bridge_mode_set(struct drm_bridge *bridge,
+				  const struct drm_display_mode *mode,
+				  const struct drm_display_mode *adj_mode)
 {
 	u32 reg;
-	struct drm_device *dev = encoder->dev;
+	struct drm_device *dev = bridge->dev;
 	struct hibmc_drm_private *priv = dev->dev_private;
 
 	reg = readl(priv->mmio + HIBMC_DISPLAY_CONTROL_HISILE);
@@ -85,8 +85,8 @@ static void hibmc_encoder_mode_set(struct drm_encoder *encoder,
 	writel(reg, priv->mmio + HIBMC_DISPLAY_CONTROL_HISILE);
 }
 
-static const struct drm_encoder_helper_funcs hibmc_encoder_helper_funcs = {
-	.mode_set = hibmc_encoder_mode_set,
+static const struct drm_bridge_funcs hibmc_bridge_funcs = {
+	.mode_set = hibmc_bridge_mode_set,
 };
 
 static const struct drm_encoder_funcs hibmc_encoder_funcs = {
@@ -114,6 +114,7 @@ int hibmc_vdac_init(struct hibmc_drm_private *priv)
 	}
 
 	encoder->possible_crtcs = 0x1;
+	encoder->bridge.funcs = &hibmc_bridge_funcs;
 	ret = drm_encoder_init(dev, encoder, &hibmc_encoder_funcs,
 			       DRM_MODE_ENCODER_DAC, NULL);
 	if (ret) {
@@ -121,7 +122,6 @@ int hibmc_vdac_init(struct hibmc_drm_private *priv)
 		return ret;
 	}
 
-	drm_encoder_helper_add(encoder, &hibmc_encoder_helper_funcs);
 	drm_connector_attach_encoder(connector, encoder);
 
 	return 0;
