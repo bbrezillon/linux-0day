@@ -841,8 +841,9 @@ static void tegra_dsi_unprepare(struct tegra_dsi *dsi)
 	pm_runtime_put(dsi->dev);
 }
 
-static void tegra_dsi_encoder_disable(struct drm_encoder *encoder)
+static void tegra_dsi_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct tegra_output *output = encoder_to_output(encoder);
 	struct tegra_dc *dc = to_tegra_dc(encoder->crtc);
 	struct tegra_dsi *dsi = to_dsi(output);
@@ -899,8 +900,9 @@ static void tegra_dsi_prepare(struct tegra_dsi *dsi)
 		tegra_dsi_prepare(dsi->slave);
 }
 
-static void tegra_dsi_encoder_enable(struct drm_encoder *encoder)
+static void tegra_dsi_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct drm_display_mode *mode = &encoder->crtc->state->adjusted_mode;
 	struct tegra_output *output = encoder_to_output(encoder);
 	struct tegra_dc *dc = to_tegra_dc(encoder->crtc);
@@ -940,10 +942,12 @@ static void tegra_dsi_encoder_enable(struct drm_encoder *encoder)
 }
 
 static int
-tegra_dsi_encoder_atomic_check(struct drm_encoder *encoder,
-			       struct drm_crtc_state *crtc_state,
-			       struct drm_connector_state *conn_state)
+tegra_dsi_bridge_atomic_check(struct drm_bridge *bridge,
+			      struct drm_bridge_state *bridge_state,
+			      struct drm_crtc_state *crtc_state,
+			      struct drm_connector_state *conn_state)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct tegra_output *output = encoder_to_output(encoder);
 	struct tegra_dsi_state *state = to_dsi_state(conn_state);
 	struct tegra_dc *dc = to_tegra_dc(conn_state->crtc);
@@ -1020,10 +1024,10 @@ tegra_dsi_encoder_atomic_check(struct drm_encoder *encoder,
 	return err;
 }
 
-static const struct drm_encoder_helper_funcs tegra_dsi_encoder_helper_funcs = {
-	.disable = tegra_dsi_encoder_disable,
-	.enable = tegra_dsi_encoder_enable,
-	.atomic_check = tegra_dsi_encoder_atomic_check,
+static const struct drm_bridge_funcs tegra_dsi_bridge_funcs = {
+	.disable = tegra_dsi_bridge_disable,
+	.enable = tegra_dsi_bridge_enable,
+	.atomic_check = tegra_dsi_bridge_atomic_check,
 };
 
 static int tegra_dsi_init(struct host1x_client *client)
@@ -1043,11 +1047,10 @@ static int tegra_dsi_init(struct host1x_client *client)
 					 &tegra_dsi_connector_helper_funcs);
 		dsi->output.connector.dpms = DRM_MODE_DPMS_OFF;
 
+		dsi->output.encoder.bridge.funcs = &tegra_dsi_bridge_funcs;
 		drm_encoder_init(drm, &dsi->output.encoder,
 				 &tegra_dsi_encoder_funcs,
 				 DRM_MODE_ENCODER_DSI, NULL);
-		drm_encoder_helper_add(&dsi->output.encoder,
-				       &tegra_dsi_encoder_helper_funcs);
 
 		drm_connector_attach_encoder(&dsi->output.connector,
 						  &dsi->output.encoder);

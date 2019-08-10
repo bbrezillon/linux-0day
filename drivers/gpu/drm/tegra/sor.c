@@ -1581,8 +1581,9 @@ static const struct drm_encoder_funcs tegra_sor_encoder_funcs = {
 	.destroy = tegra_output_encoder_destroy,
 };
 
-static void tegra_sor_edp_disable(struct drm_encoder *encoder)
+static void tegra_sor_edp_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct tegra_output *output = encoder_to_output(encoder);
 	struct tegra_dc *dc = to_tegra_dc(encoder->crtc);
 	struct tegra_sor *sor = to_sor(output);
@@ -1673,8 +1674,9 @@ static int calc_h_ref_to_sync(const struct drm_display_mode *mode,
 }
 #endif
 
-static void tegra_sor_edp_enable(struct drm_encoder *encoder)
+static void tegra_sor_edp_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct drm_display_mode *mode = &encoder->crtc->state->adjusted_mode;
 	struct tegra_output *output = encoder_to_output(encoder);
 	struct tegra_dc *dc = to_tegra_dc(encoder->crtc);
@@ -1979,10 +1981,12 @@ static void tegra_sor_edp_enable(struct drm_encoder *encoder)
 }
 
 static int
-tegra_sor_encoder_atomic_check(struct drm_encoder *encoder,
-			       struct drm_crtc_state *crtc_state,
-			       struct drm_connector_state *conn_state)
+tegra_sor_bridge_atomic_check(struct drm_bridge *bridge,
+			      struct drm_bridge_state *bridge_state,
+			      struct drm_crtc_state *crtc_state,
+			      struct drm_connector_state *conn_state)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct tegra_output *output = encoder_to_output(encoder);
 	struct tegra_sor_state *state = to_sor_state(conn_state);
 	struct tegra_dc *dc = to_tegra_dc(conn_state->crtc);
@@ -2027,10 +2031,10 @@ tegra_sor_encoder_atomic_check(struct drm_encoder *encoder,
 	return 0;
 }
 
-static const struct drm_encoder_helper_funcs tegra_sor_edp_helpers = {
+static const struct drm_bridge_funcs tegra_sor_edp_bridge_funcs = {
 	.disable = tegra_sor_edp_disable,
 	.enable = tegra_sor_edp_enable,
-	.atomic_check = tegra_sor_encoder_atomic_check,
+	.atomic_check = tegra_sor_bridge_atomic_check,
 };
 
 static inline u32 tegra_sor_hdmi_subpack(const u8 *ptr, size_t size)
@@ -2374,8 +2378,9 @@ static void tegra_sor_hdmi_scdc_start(struct tegra_sor *sor)
 	}
 }
 
-static void tegra_sor_hdmi_disable(struct drm_encoder *encoder)
+static void tegra_sor_hdmi_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct tegra_output *output = encoder_to_output(encoder);
 	struct tegra_dc *dc = to_tegra_dc(encoder->crtc);
 	struct tegra_sor *sor = to_sor(output);
@@ -2415,8 +2420,9 @@ static void tegra_sor_hdmi_disable(struct drm_encoder *encoder)
 	pm_runtime_put(sor->dev);
 }
 
-static void tegra_sor_hdmi_enable(struct drm_encoder *encoder)
+static void tegra_sor_hdmi_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct tegra_output *output = encoder_to_output(encoder);
 	unsigned int h_ref_to_sync = 1, pulse_start, max_ac;
 	struct tegra_dc *dc = to_tegra_dc(encoder->crtc);
@@ -2794,16 +2800,16 @@ static void tegra_sor_hdmi_enable(struct drm_encoder *encoder)
 	tegra_sor_audio_prepare(sor);
 }
 
-static const struct drm_encoder_helper_funcs tegra_sor_hdmi_helpers = {
+static const struct drm_bridge_funcs tegra_sor_hdmi_bridge_funcs = {
 	.disable = tegra_sor_hdmi_disable,
 	.enable = tegra_sor_hdmi_enable,
-	.atomic_check = tegra_sor_encoder_atomic_check,
+	.atomic_check = tegra_sor_bridge_atomic_check,
 };
 
 static int tegra_sor_init(struct host1x_client *client)
 {
 	struct drm_device *drm = dev_get_drvdata(client->parent);
-	const struct drm_encoder_helper_funcs *helpers = NULL;
+	const struct drm_bridge_funcs *bridge_funcs = NULL;
 	struct tegra_sor *sor = host1x_client_to_sor(client);
 	int connector = DRM_MODE_CONNECTOR_Unknown;
 	int encoder = DRM_MODE_ENCODER_NONE;
@@ -2814,7 +2820,7 @@ static int tegra_sor_init(struct host1x_client *client)
 		if (sor->soc->supports_hdmi) {
 			connector = DRM_MODE_CONNECTOR_HDMIA;
 			encoder = DRM_MODE_ENCODER_TMDS;
-			helpers = &tegra_sor_hdmi_helpers;
+			bridge_funcs = &tegra_sor_hdmi_bridge_funcs;
 		} else if (sor->soc->supports_lvds) {
 			connector = DRM_MODE_CONNECTOR_LVDS;
 			encoder = DRM_MODE_ENCODER_LVDS;
@@ -2823,7 +2829,7 @@ static int tegra_sor_init(struct host1x_client *client)
 		if (sor->soc->supports_edp) {
 			connector = DRM_MODE_CONNECTOR_eDP;
 			encoder = DRM_MODE_ENCODER_TMDS;
-			helpers = &tegra_sor_edp_helpers;
+			bridge_funcs = &tegra_sor_edp_bridge_funcs;
 		} else if (sor->soc->supports_dp) {
 			connector = DRM_MODE_CONNECTOR_DisplayPort;
 			encoder = DRM_MODE_ENCODER_TMDS;
@@ -2839,9 +2845,9 @@ static int tegra_sor_init(struct host1x_client *client)
 				 &tegra_sor_connector_helper_funcs);
 	sor->output.connector.dpms = DRM_MODE_DPMS_OFF;
 
+	sor->output.encoder.bridge.funcs = bridge_funcs;
 	drm_encoder_init(drm, &sor->output.encoder, &tegra_sor_encoder_funcs,
 			 encoder, NULL);
-	drm_encoder_helper_add(&sor->output.encoder, helpers);
 
 	drm_connector_attach_encoder(&sor->output.connector,
 					  &sor->output.encoder);

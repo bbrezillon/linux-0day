@@ -1135,8 +1135,9 @@ static const struct drm_encoder_funcs tegra_hdmi_encoder_funcs = {
 	.destroy = tegra_output_encoder_destroy,
 };
 
-static void tegra_hdmi_encoder_disable(struct drm_encoder *encoder)
+static void tegra_hdmi_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct tegra_output *output = encoder_to_output(encoder);
 	struct tegra_dc *dc = to_tegra_dc(encoder->crtc);
 	struct tegra_hdmi *hdmi = to_hdmi(output);
@@ -1169,8 +1170,9 @@ static void tegra_hdmi_encoder_disable(struct drm_encoder *encoder)
 	pm_runtime_put(hdmi->dev);
 }
 
-static void tegra_hdmi_encoder_enable(struct drm_encoder *encoder)
+static void tegra_hdmi_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct drm_display_mode *mode = &encoder->crtc->state->adjusted_mode;
 	unsigned int h_sync_width, h_front_porch, h_back_porch, i, rekey;
 	struct tegra_output *output = encoder_to_output(encoder);
@@ -1391,10 +1393,12 @@ static void tegra_hdmi_encoder_enable(struct drm_encoder *encoder)
 }
 
 static int
-tegra_hdmi_encoder_atomic_check(struct drm_encoder *encoder,
-				struct drm_crtc_state *crtc_state,
-				struct drm_connector_state *conn_state)
+tegra_hdmi_bridge_atomic_check(struct drm_bridge *bridge,
+			       struct drm_bridge_state *bridge_state,
+			       struct drm_crtc_state *crtc_state,
+			       struct drm_connector_state *conn_state)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct tegra_output *output = encoder_to_output(encoder);
 	struct tegra_dc *dc = to_tegra_dc(conn_state->crtc);
 	unsigned long pclk = crtc_state->mode.clock * 1000;
@@ -1411,10 +1415,10 @@ tegra_hdmi_encoder_atomic_check(struct drm_encoder *encoder,
 	return err;
 }
 
-static const struct drm_encoder_helper_funcs tegra_hdmi_encoder_helper_funcs = {
-	.disable = tegra_hdmi_encoder_disable,
-	.enable = tegra_hdmi_encoder_enable,
-	.atomic_check = tegra_hdmi_encoder_atomic_check,
+static const struct drm_bridge_funcs tegra_hdmi_bridge_funcs = {
+	.disable = tegra_hdmi_bridge_disable,
+	.enable = tegra_hdmi_bridge_enable,
+	.atomic_check = tegra_hdmi_bridge_atomic_check,
 };
 
 static int tegra_hdmi_init(struct host1x_client *client)
@@ -1432,10 +1436,9 @@ static int tegra_hdmi_init(struct host1x_client *client)
 				 &tegra_hdmi_connector_helper_funcs);
 	hdmi->output.connector.dpms = DRM_MODE_DPMS_OFF;
 
+	hdmi->output.encoder.bridge.funcs = &tegra_hdmi_bridge_funcs;
 	drm_encoder_init(drm, &hdmi->output.encoder, &tegra_hdmi_encoder_funcs,
 			 DRM_MODE_ENCODER_TMDS, NULL);
-	drm_encoder_helper_add(&hdmi->output.encoder,
-			       &tegra_hdmi_encoder_helper_funcs);
 
 	drm_connector_attach_encoder(&hdmi->output.connector,
 					  &hdmi->output.encoder);

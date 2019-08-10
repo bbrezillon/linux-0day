@@ -114,8 +114,9 @@ static const struct drm_encoder_funcs tegra_rgb_encoder_funcs = {
 	.destroy = tegra_output_encoder_destroy,
 };
 
-static void tegra_rgb_encoder_disable(struct drm_encoder *encoder)
+static void tegra_rgb_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct tegra_output *output = encoder_to_output(encoder);
 	struct tegra_rgb *rgb = to_rgb(output);
 
@@ -129,8 +130,9 @@ static void tegra_rgb_encoder_disable(struct drm_encoder *encoder)
 		drm_panel_unprepare(output->panel);
 }
 
-static void tegra_rgb_encoder_enable(struct drm_encoder *encoder)
+static void tegra_rgb_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct tegra_output *output = encoder_to_output(encoder);
 	struct tegra_rgb *rgb = to_rgb(output);
 	u32 value;
@@ -165,10 +167,12 @@ static void tegra_rgb_encoder_enable(struct drm_encoder *encoder)
 }
 
 static int
-tegra_rgb_encoder_atomic_check(struct drm_encoder *encoder,
-			       struct drm_crtc_state *crtc_state,
-			       struct drm_connector_state *conn_state)
+tegra_rgb_bridge_atomic_check(struct drm_bridge *bridge,
+			      struct drm_bridge_state *bridge_state,
+			      struct drm_crtc_state *crtc_state,
+			      struct drm_connector_state *conn_state)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct tegra_output *output = encoder_to_output(encoder);
 	struct tegra_dc *dc = to_tegra_dc(conn_state->crtc);
 	unsigned long pclk = crtc_state->mode.clock * 1000;
@@ -205,10 +209,10 @@ tegra_rgb_encoder_atomic_check(struct drm_encoder *encoder,
 	return err;
 }
 
-static const struct drm_encoder_helper_funcs tegra_rgb_encoder_helper_funcs = {
-	.disable = tegra_rgb_encoder_disable,
-	.enable = tegra_rgb_encoder_enable,
-	.atomic_check = tegra_rgb_encoder_atomic_check,
+static const struct drm_bridge_funcs tegra_rgb_bridge_funcs = {
+	.disable = tegra_rgb_bridge_disable,
+	.enable = tegra_rgb_bridge_enable,
+	.atomic_check = tegra_rgb_bridge_atomic_check,
 };
 
 int tegra_dc_rgb_probe(struct tegra_dc *dc)
@@ -281,10 +285,9 @@ int tegra_dc_rgb_init(struct drm_device *drm, struct tegra_dc *dc)
 				 &tegra_rgb_connector_helper_funcs);
 	output->connector.dpms = DRM_MODE_DPMS_OFF;
 
+	output->encoder.bridge.funcs = &tegra_rgb_bridge_funcs;
 	drm_encoder_init(drm, &output->encoder, &tegra_rgb_encoder_funcs,
 			 DRM_MODE_ENCODER_LVDS, NULL);
-	drm_encoder_helper_add(&output->encoder,
-			       &tegra_rgb_encoder_helper_funcs);
 
 	drm_connector_attach_encoder(&output->connector,
 					  &output->encoder);
