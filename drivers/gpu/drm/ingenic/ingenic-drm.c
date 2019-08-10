@@ -382,10 +382,12 @@ static void ingenic_drm_plane_atomic_update(struct drm_plane *plane,
 	priv->dma_hwdesc->cmd |= JZ_LCD_CMD_EOF_IRQ;
 }
 
-static void ingenic_drm_encoder_atomic_mode_set(struct drm_encoder *encoder,
-						struct drm_crtc_state *crtc_state,
-						struct drm_connector_state *conn_state)
+static void ingenic_drm_bridge_atomic_mode_set(struct drm_bridge *bridge,
+					       struct drm_bridge_state *bridge_state,
+					       struct drm_crtc_state *crtc_state,
+					       struct drm_connector_state *conn_state)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct ingenic_drm *priv = drm_encoder_get_priv(encoder);
 	struct drm_display_mode *mode = &crtc_state->adjusted_mode;
 	struct drm_connector *conn = conn_state->connector;
@@ -439,9 +441,10 @@ static void ingenic_drm_encoder_atomic_mode_set(struct drm_encoder *encoder,
 	regmap_write(priv->map, JZ_REG_LCD_CFG, cfg);
 }
 
-static int ingenic_drm_encoder_atomic_check(struct drm_encoder *encoder,
-					    struct drm_crtc_state *crtc_state,
-					    struct drm_connector_state *conn_state)
+static int ingenic_drm_bridge_atomic_check(struct drm_bridge *bridge,
+					   struct drm_bridge_state *bridge_state,
+					   struct drm_crtc_state *crtc_state,
+					   struct drm_connector_state *conn_state)
 {
 	struct drm_display_info *info = &conn_state->connector->display_info;
 
@@ -570,9 +573,9 @@ static const struct drm_crtc_helper_funcs ingenic_drm_crtc_helper_funcs = {
 	.atomic_check		= ingenic_drm_crtc_atomic_check,
 };
 
-static const struct drm_encoder_helper_funcs ingenic_drm_encoder_helper_funcs = {
-	.atomic_mode_set	= ingenic_drm_encoder_atomic_mode_set,
-	.atomic_check		= ingenic_drm_encoder_atomic_check,
+static const struct drm_bridge_funcs ingenic_drm_bridge_funcs = {
+	.atomic_mode_set	= ingenic_drm_bridge_atomic_mode_set,
+	.atomic_check		= ingenic_drm_bridge_atomic_check,
 };
 
 static const struct drm_mode_config_funcs ingenic_drm_mode_config_funcs = {
@@ -717,8 +720,7 @@ static int ingenic_drm_probe(struct platform_device *pdev)
 
 	priv->encoder.possible_crtcs = 1;
 
-	drm_encoder_helper_add(&priv->encoder,
-			       &ingenic_drm_encoder_helper_funcs);
+	priv->encoder.bridge.funcs = &ingenic_drm_bridge_funcs;
 
 	ret = drm_encoder_init(drm, &priv->encoder, &ingenic_drm_encoder_funcs,
 			       DRM_MODE_ENCODER_DPI, NULL);
