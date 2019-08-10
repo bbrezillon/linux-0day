@@ -121,10 +121,12 @@ static const s16 rgb2yuv_coeffs_bt709_limited[MALIDP_COLORADJ_NUM_COEFFS] = {
 };
 
 static int
-malidp_mw_encoder_atomic_check(struct drm_encoder *encoder,
+malidp_mw_encoder_atomic_check(struct drm_bridge *bridge,
+			       struct drm_bridge_state *bridge_state,
 			       struct drm_crtc_state *crtc_state,
 			       struct drm_connector_state *conn_state)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct malidp_mw_connector_state *mw_state = to_mw_state(conn_state);
 	struct malidp_drm *malidp = encoder->dev->dev_private;
 	struct drm_framebuffer *fb;
@@ -180,7 +182,7 @@ malidp_mw_encoder_atomic_check(struct drm_encoder *encoder,
 	return 0;
 }
 
-static const struct drm_encoder_helper_funcs malidp_mw_encoder_helper_funcs = {
+static const struct drm_bridge_funcs malidp_mw_bridge_funcs = {
 	.atomic_check = malidp_mw_encoder_atomic_check,
 };
 
@@ -222,9 +224,9 @@ int malidp_mw_connector_init(struct drm_device *drm)
 	if (!formats)
 		return -ENOMEM;
 
+	malidp->mw_connector.encoder.bridge.funcs = &malidp_mw_bridge_funcs;
 	ret = drm_writeback_connector_init(drm, &malidp->mw_connector,
-					   &malidp_mw_connector_funcs,
-					   &malidp_mw_encoder_helper_funcs,
+					   &malidp_mw_connector_funcs, NULL,
 					   formats, n_formats);
 	kfree(formats);
 	if (ret)

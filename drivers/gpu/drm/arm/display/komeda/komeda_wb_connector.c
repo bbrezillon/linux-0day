@@ -33,9 +33,10 @@ komeda_wb_init_data_flow(struct komeda_layer *wb_layer,
 }
 
 static int
-komeda_wb_encoder_atomic_check(struct drm_encoder *encoder,
-			       struct drm_crtc_state *crtc_st,
-			       struct drm_connector_state *conn_st)
+komeda_wb_bridge_atomic_check(struct drm_bridge *bridge,
+			      struct drm_bridge_state *bridge_state,
+			      struct drm_crtc_state *crtc_st,
+			      struct drm_connector_state *conn_st)
 {
 	struct komeda_crtc_state *kcrtc_st = to_kcrtc_st(crtc_st);
 	struct drm_writeback_job *writeback_job = conn_st->writeback_job;
@@ -76,8 +77,8 @@ komeda_wb_encoder_atomic_check(struct drm_encoder *encoder,
 	return err;
 }
 
-static const struct drm_encoder_helper_funcs komeda_wb_encoder_helper_funcs = {
-	.atomic_check = komeda_wb_encoder_atomic_check,
+static const struct drm_bridge_funcs komeda_wb_bridge_funcs = {
+	.atomic_check = komeda_wb_bridge_atomic_check,
 };
 
 static int
@@ -161,9 +162,9 @@ static int komeda_wb_connector_add(struct komeda_kms_dev *kms,
 					       kwb_conn->wb_layer->layer_type,
 					       &n_formats);
 
+	wb_conn->encoder.bridge.funcs = &komeda_wb_bridge_funcs;
 	err = drm_writeback_connector_init(&kms->base, wb_conn,
-					   &komeda_wb_connector_funcs,
-					   &komeda_wb_encoder_helper_funcs,
+					   &komeda_wb_connector_funcs, NULL,
 					   formats, n_formats);
 	komeda_put_fourcc_list(formats);
 	if (err)
