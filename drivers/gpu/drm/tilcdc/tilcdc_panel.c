@@ -40,49 +40,45 @@ struct panel_encoder {
 };
 #define to_panel_encoder(x) container_of(x, struct panel_encoder, base)
 
-static void panel_encoder_dpms(struct drm_encoder *encoder, int mode)
+static void panel_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct panel_encoder *panel_encoder = to_panel_encoder(encoder);
 	struct backlight_device *backlight = panel_encoder->mod->backlight;
 	struct gpio_desc *gpio = panel_encoder->mod->enable_gpio;
 
 	if (backlight) {
-		backlight->props.power = mode == DRM_MODE_DPMS_ON ?
-					 FB_BLANK_UNBLANK : FB_BLANK_POWERDOWN;
+		backlight->props.power = FB_BLANK_POWERDOWN;
 		backlight_update_status(backlight);
 	}
 
 	if (gpio)
-		gpiod_set_value_cansleep(gpio,
-					 mode == DRM_MODE_DPMS_ON ? 1 : 0);
+		gpiod_set_value_cansleep(gpio, 0);
 }
 
-static void panel_encoder_prepare(struct drm_encoder *encoder)
+static void panel_bridge_enable(struct drm_bridge *bridge)
 {
-	panel_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
-}
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
+	struct panel_encoder *panel_encoder = to_panel_encoder(encoder);
+	struct backlight_device *backlight = panel_encoder->mod->backlight;
+	struct gpio_desc *gpio = panel_encoder->mod->enable_gpio;
 
-static void panel_encoder_commit(struct drm_encoder *encoder)
-{
-	panel_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
-}
+	if (backlight) {
+		backlight->props.power = FB_BLANK_UNBLANK;
+		backlight_update_status(backlight);
+	}
 
-static void panel_encoder_mode_set(struct drm_encoder *encoder,
-		struct drm_display_mode *mode,
-		struct drm_display_mode *adjusted_mode)
-{
-	/* nothing needed */
+	if (gpio)
+		gpiod_set_value_cansleep(gpio, 1);
 }
 
 static const struct drm_encoder_funcs panel_encoder_funcs = {
 		.destroy        = drm_encoder_cleanup,
 };
 
-static const struct drm_encoder_helper_funcs panel_encoder_helper_funcs = {
-		.dpms           = panel_encoder_dpms,
-		.prepare        = panel_encoder_prepare,
-		.commit         = panel_encoder_commit,
-		.mode_set       = panel_encoder_mode_set,
+static const struct drm_bridge_funcs panel_bridge_funcs = {
+	.disable = panel_bridge_disable,
+	.enable = panel_bridge_enable,
 };
 
 static struct drm_encoder *panel_encoder_create(struct drm_device *dev,
@@ -101,13 +97,12 @@ static struct drm_encoder *panel_encoder_create(struct drm_device *dev,
 
 	encoder = &panel_encoder->base;
 	encoder->possible_crtcs = 1;
+	encoder->bridge.funcs = &panel_bridge_funcs;
 
 	ret = drm_encoder_init(dev, encoder, &panel_encoder_funcs,
 			DRM_MODE_ENCODER_LVDS, NULL);
 	if (ret < 0)
 		goto fail;
-
-	drm_encoder_helper_add(encoder, &panel_encoder_helper_funcs);
 
 	return encoder;
 

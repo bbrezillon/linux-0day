@@ -44,54 +44,34 @@ static const struct tilcdc_panel_info dvi_info = {
 struct tfp410_encoder {
 	struct drm_encoder base;
 	struct tfp410_module *mod;
-	int dpms;
 };
 #define to_tfp410_encoder(x) container_of(x, struct tfp410_encoder, base)
 
-static void tfp410_encoder_dpms(struct drm_encoder *encoder, int mode)
+static void tfp410_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct tfp410_encoder *tfp410_encoder = to_tfp410_encoder(encoder);
 
-	if (tfp410_encoder->dpms == mode)
-		return;
-
-	if (mode == DRM_MODE_DPMS_ON) {
-		DBG("Power on");
-		gpio_direction_output(tfp410_encoder->mod->gpio, 1);
-	} else {
-		DBG("Power off");
-		gpio_direction_output(tfp410_encoder->mod->gpio, 0);
-	}
-
-	tfp410_encoder->dpms = mode;
+	DBG("Power off");
+	gpio_direction_output(tfp410_encoder->mod->gpio, 0);
 }
 
-static void tfp410_encoder_prepare(struct drm_encoder *encoder)
+static void tfp410_bridge_enable(struct drm_bridge *bridge)
 {
-	tfp410_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
-}
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
+	struct tfp410_encoder *tfp410_encoder = to_tfp410_encoder(encoder);
 
-static void tfp410_encoder_commit(struct drm_encoder *encoder)
-{
-	tfp410_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
-}
-
-static void tfp410_encoder_mode_set(struct drm_encoder *encoder,
-		struct drm_display_mode *mode,
-		struct drm_display_mode *adjusted_mode)
-{
-	/* nothing needed */
+	DBG("Power on");
+	gpio_direction_output(tfp410_encoder->mod->gpio, 1);
 }
 
 static const struct drm_encoder_funcs tfp410_encoder_funcs = {
 		.destroy        = drm_encoder_cleanup,
 };
 
-static const struct drm_encoder_helper_funcs tfp410_encoder_helper_funcs = {
-		.dpms           = tfp410_encoder_dpms,
-		.prepare        = tfp410_encoder_prepare,
-		.commit         = tfp410_encoder_commit,
-		.mode_set       = tfp410_encoder_mode_set,
+static const struct drm_bridge_funcs tfp410_bridge_funcs = {
+	.disable = tfp410_bridge_disable,
+	.disable = tfp410_bridge_enable,
 };
 
 static struct drm_encoder *tfp410_encoder_create(struct drm_device *dev,
@@ -106,18 +86,16 @@ static struct drm_encoder *tfp410_encoder_create(struct drm_device *dev,
 	if (!tfp410_encoder)
 		return NULL;
 
-	tfp410_encoder->dpms = DRM_MODE_DPMS_OFF;
 	tfp410_encoder->mod = mod;
 
 	encoder = &tfp410_encoder->base;
 	encoder->possible_crtcs = 1;
 
+	encoder->bridge.funcs = &tfp410_bridge_funcs;
 	ret = drm_encoder_init(dev, encoder, &tfp410_encoder_funcs,
 			DRM_MODE_ENCODER_TMDS, NULL);
 	if (ret < 0)
 		goto fail;
-
-	drm_encoder_helper_add(encoder, &tfp410_encoder_helper_funcs);
 
 	return encoder;
 
