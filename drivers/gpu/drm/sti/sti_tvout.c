@@ -582,16 +582,6 @@ static int tvout_debugfs_init(struct sti_tvout *tvout, struct drm_minor *minor)
 					minor->debugfs_root, minor);
 }
 
-static void sti_tvout_encoder_dpms(struct drm_encoder *encoder, int mode)
-{
-}
-
-static void sti_tvout_encoder_mode_set(struct drm_encoder *encoder,
-				       struct drm_display_mode *mode,
-				       struct drm_display_mode *adjusted_mode)
-{
-}
-
 static void sti_tvout_encoder_destroy(struct drm_encoder *encoder)
 {
 	struct sti_tvout_encoder *sti_encoder = to_sti_tvout_encoder(encoder);
@@ -632,8 +622,9 @@ static const struct drm_encoder_funcs sti_tvout_encoder_funcs = {
 	.early_unregister = sti_tvout_early_unregister,
 };
 
-static void sti_dvo_encoder_enable(struct drm_encoder *encoder)
+static void sti_dvo_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sti_tvout *tvout = to_sti_tvout(encoder);
 
 	tvout_preformatter_set_matrix(tvout, &encoder->crtc->mode);
@@ -641,19 +632,18 @@ static void sti_dvo_encoder_enable(struct drm_encoder *encoder)
 	tvout_dvo_start(tvout, sti_crtc_is_main(encoder->crtc));
 }
 
-static void sti_dvo_encoder_disable(struct drm_encoder *encoder)
+static void sti_dvo_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sti_tvout *tvout = to_sti_tvout(encoder);
 
 	/* Reset VIP register */
 	tvout_write(tvout, 0x0, TVO_VIP_DVO);
 }
 
-static const struct drm_encoder_helper_funcs sti_dvo_encoder_helper_funcs = {
-	.dpms = sti_tvout_encoder_dpms,
-	.mode_set = sti_tvout_encoder_mode_set,
-	.enable = sti_dvo_encoder_enable,
-	.disable = sti_dvo_encoder_disable,
+static const struct drm_bridge_funcs sti_dvo_bridge_funcs = {
+	.enable = sti_dvo_bridge_enable,
+	.disable = sti_dvo_bridge_disable,
 };
 
 static struct drm_encoder *
@@ -672,18 +662,18 @@ sti_tvout_create_dvo_encoder(struct drm_device *dev,
 	drm_encoder = &encoder->encoder;
 
 	drm_encoder->possible_crtcs = ENCODER_CRTC_MASK;
+	drm_encoder->bridge.funcs = &sti_dvo_bridge_funcs;
 
 	drm_encoder_init(dev, drm_encoder,
 			 &sti_tvout_encoder_funcs, DRM_MODE_ENCODER_LVDS,
 			 NULL);
 
-	drm_encoder_helper_add(drm_encoder, &sti_dvo_encoder_helper_funcs);
-
 	return drm_encoder;
 }
 
-static void sti_hda_encoder_enable(struct drm_encoder *encoder)
+static void sti_hda_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sti_tvout *tvout = to_sti_tvout(encoder);
 
 	tvout_preformatter_set_matrix(tvout, &encoder->crtc->mode);
@@ -691,8 +681,9 @@ static void sti_hda_encoder_enable(struct drm_encoder *encoder)
 	tvout_hda_start(tvout, sti_crtc_is_main(encoder->crtc));
 }
 
-static void sti_hda_encoder_disable(struct drm_encoder *encoder)
+static void sti_hda_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sti_tvout *tvout = to_sti_tvout(encoder);
 
 	/* reset VIP register */
@@ -702,11 +693,9 @@ static void sti_hda_encoder_disable(struct drm_encoder *encoder)
 	tvout_write(tvout, 1, TVO_HD_DAC_CFG_OFF);
 }
 
-static const struct drm_encoder_helper_funcs sti_hda_encoder_helper_funcs = {
-	.dpms = sti_tvout_encoder_dpms,
-	.mode_set = sti_tvout_encoder_mode_set,
-	.commit = sti_hda_encoder_enable,
-	.disable = sti_hda_encoder_disable,
+static const struct drm_bridge_funcs sti_hda_bridge_funcs = {
+	.enable = sti_hda_bridge_enable,
+	.disable = sti_hda_bridge_disable,
 };
 
 static struct drm_encoder *sti_tvout_create_hda_encoder(struct drm_device *dev,
@@ -725,16 +714,17 @@ static struct drm_encoder *sti_tvout_create_hda_encoder(struct drm_device *dev,
 
 	drm_encoder->possible_crtcs = ENCODER_CRTC_MASK;
 
+	drm_encoder->bridge.funcs = &sti_hda_bridge_funcs;
 	drm_encoder_init(dev, drm_encoder,
 			&sti_tvout_encoder_funcs, DRM_MODE_ENCODER_DAC, NULL);
 
-	drm_encoder_helper_add(drm_encoder, &sti_hda_encoder_helper_funcs);
 
 	return drm_encoder;
 }
 
-static void sti_hdmi_encoder_enable(struct drm_encoder *encoder)
+static void sti_hdmi_bridge_enable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sti_tvout *tvout = to_sti_tvout(encoder);
 
 	tvout_preformatter_set_matrix(tvout, &encoder->crtc->mode);
@@ -742,19 +732,18 @@ static void sti_hdmi_encoder_enable(struct drm_encoder *encoder)
 	tvout_hdmi_start(tvout, sti_crtc_is_main(encoder->crtc));
 }
 
-static void sti_hdmi_encoder_disable(struct drm_encoder *encoder)
+static void sti_hdmi_bridge_disable(struct drm_bridge *bridge)
 {
+	struct drm_encoder *encoder = bridge_to_encoder(bridge);
 	struct sti_tvout *tvout = to_sti_tvout(encoder);
 
 	/* reset VIP register */
 	tvout_write(tvout, 0x0, TVO_VIP_HDMI);
 }
 
-static const struct drm_encoder_helper_funcs sti_hdmi_encoder_helper_funcs = {
-	.dpms = sti_tvout_encoder_dpms,
-	.mode_set = sti_tvout_encoder_mode_set,
-	.commit = sti_hdmi_encoder_enable,
-	.disable = sti_hdmi_encoder_disable,
+static const struct drm_bridge_funcs sti_hdmi_bridge_funcs = {
+	.enable = sti_hdmi_bridge_enable,
+	.disable = sti_hdmi_bridge_disable,
 };
 
 static struct drm_encoder *sti_tvout_create_hdmi_encoder(struct drm_device *dev,
@@ -772,11 +761,10 @@ static struct drm_encoder *sti_tvout_create_hdmi_encoder(struct drm_device *dev,
 	drm_encoder = &encoder->encoder;
 
 	drm_encoder->possible_crtcs = ENCODER_CRTC_MASK;
+	drm_encoder->bridge.funcs = &sti_hdmi_bridge_funcs;
 
 	drm_encoder_init(dev, drm_encoder,
 			&sti_tvout_encoder_funcs, DRM_MODE_ENCODER_TMDS, NULL);
-
-	drm_encoder_helper_add(drm_encoder, &sti_hdmi_encoder_helper_funcs);
 
 	return drm_encoder;
 }
