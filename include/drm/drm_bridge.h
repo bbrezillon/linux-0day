@@ -429,6 +429,22 @@ struct drm_bridge_funcs {
 			    struct drm_bridge_state *bridge_state,
 			    struct drm_crtc_state *crtc_state,
 			    struct drm_connector_state *conn_state);
+
+	/**
+	 * @atomic_mode_set:
+	 *
+	 * This callback should set the given mode on the bridge. It is called
+	 * after the @atomic_mode_set or @mode_set callback for the preceding
+	 * element in the display pipeline has been called already. If the
+	 * bridge is the first element then this would be
+	 * &drm_encoder_helper_funcs.mode_set or
+	 * &drm_encoder_helper_funcs.atomic_mode_set. The display pipe (i.e.
+	 * clocks and timing signals) is off when this function is called.
+	 */
+	void (*atomic_mode_set)(struct drm_bridge *bridge,
+				struct drm_bridge_state *bridge_state,
+				struct drm_crtc_state *crtc_state,
+				struct drm_connector_state *conn_state);
 };
 
 /**
@@ -549,6 +565,9 @@ void drm_atomic_bridge_chain_pre_enable(struct drm_bridge *bridge,
 					struct drm_atomic_state *state);
 void drm_atomic_bridge_chain_enable(struct drm_bridge *bridge,
 				    struct drm_atomic_state *state);
+void drm_atomic_bridge_chain_mode_set(struct drm_bridge *bridge,
+				      struct drm_crtc_state *crtc_state,
+				      struct drm_connector_state *conn_state);
 
 void drm_atomic_helper_init_bridge_state(struct drm_bridge *bridge,
 					 struct drm_bridge_state *state);

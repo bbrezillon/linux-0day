@@ -1244,7 +1244,9 @@ crtc_set_mode(struct drm_device *dev, struct drm_atomic_state *old_state)
 			funcs->mode_set(encoder, mode, adjusted_mode);
 		}
 
-		drm_bridge_chain_mode_set(&encoder->bridge, mode, adjusted_mode);
+		drm_atomic_bridge_chain_mode_set(&encoder->bridge,
+						 new_crtc_state,
+						 new_conn_state);
 	}
 }
 

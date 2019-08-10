@@ -600,6 +600,43 @@ void drm_atomic_bridge_chain_enable(struct drm_bridge *bridge,
 }
 EXPORT_SYMBOL(drm_atomic_bridge_chain_enable);
 
+/**
+ * drm_bridge_atomic_chain_mode_set - set proposed mode for all bridges in the
+ *				      encoder chain
+ * @bridge: bridge control structure
+ * @crtc_state: CRTC atomic state being committed
+ * @conn_state: connector atomic state being commited
+ *
+ * Calls &drm_bridge_funcs.atomic_mode_set() (or &drm_bridge_funcs.mode_set()
+ * if the atomic version is not implemented) for all the bridges in the
+ * encoder chain, starting from the first bridge to the last.
+ */
+void drm_atomic_bridge_chain_mode_set(struct drm_bridge *bridge,
+				      struct drm_crtc_state *crtc_state,
+				      struct drm_connector_state *conn_state)
+{
+	struct drm_encoder *encoder = bridge->encoder;
+
+	list_for_each_entry_from(bridge, &encoder->bridge_chain, chain_node) {
+		if (bridge->funcs->atomic_mode_set) {
+			struct drm_atomic_state *state = crtc_state->state;
+			struct drm_bridge_state *bridge_state;
+
+			bridge_state = drm_atomic_get_new_bridge_state(state,
+								       bridge);
+			if (WARN_ON(!bridge_state))
+				return;
+
+			bridge->funcs->atomic_mode_set(bridge, bridge_state,
+						       crtc_state, conn_state);
+		} else if (bridge->funcs->mode_set) {
+			bridge->funcs->mode_set(bridge, &crtc_state->mode,
+						&crtc_state->adjusted_mode);
+		}
+	}
+}
+EXPORT_SYMBOL(drm_atomic_bridge_chain_mode_set);
+
 static int drm_find_best_bus_format(const struct drm_bus_caps *a,
 				    const struct drm_bus_caps *b,
 				    const struct drm_display_mode *mode,
