@@ -135,20 +135,6 @@ static const struct drm_crtc_helper_funcs virtio_gpu_crtc_helper_funcs = {
 	.atomic_disable = virtio_gpu_crtc_atomic_disable,
 };
 
-static void virtio_gpu_enc_mode_set(struct drm_encoder *encoder,
-				    struct drm_display_mode *mode,
-				    struct drm_display_mode *adjusted_mode)
-{
-}
-
-static void virtio_gpu_enc_enable(struct drm_encoder *encoder)
-{
-}
-
-static void virtio_gpu_enc_disable(struct drm_encoder *encoder)
-{
-}
-
 static int virtio_gpu_conn_get_modes(struct drm_connector *connector)
 {
 	struct virtio_gpu_output *output =
@@ -203,12 +189,6 @@ static enum drm_mode_status virtio_gpu_conn_mode_valid(struct drm_connector *con
 	DRM_DEBUG("del mode: %dx%d\n", mode->hdisplay, mode->vdisplay);
 	return MODE_BAD;
 }
-
-static const struct drm_encoder_helper_funcs virtio_gpu_enc_helper_funcs = {
-	.mode_set   = virtio_gpu_enc_mode_set,
-	.enable     = virtio_gpu_enc_enable,
-	.disable    = virtio_gpu_enc_disable,
-};
 
 static const struct drm_connector_helper_funcs virtio_gpu_conn_helper_funcs = {
 	.get_modes    = virtio_gpu_conn_get_modes,
@@ -281,7 +261,6 @@ static int vgdev_output_init(struct virtio_gpu_device *vgdev, int index)
 
 	drm_encoder_init(dev, encoder, &virtio_gpu_enc_funcs,
 			 DRM_MODE_ENCODER_VIRTUAL, NULL);
-	drm_encoder_helper_add(encoder, &virtio_gpu_enc_helper_funcs);
 	encoder->possible_crtcs = 1 << index;
 
 	drm_connector_attach_encoder(connector, encoder);
