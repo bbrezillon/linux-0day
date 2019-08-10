@@ -23,9 +23,6 @@
  * Encoder
  */
 
-static const struct drm_encoder_helper_funcs encoder_helper_funcs = {
-};
-
 static const struct drm_encoder_funcs encoder_funcs = {
 	.destroy = drm_encoder_cleanup,
 };
@@ -114,8 +111,6 @@ int rcar_du_encoder_init(struct rcar_du_device *rcdu,
 			       DRM_MODE_ENCODER_NONE, NULL);
 	if (ret < 0)
 		goto done;
-
-	drm_encoder_helper_add(encoder, &encoder_helper_funcs);
 
 	/*
 	 * Attach the bridge to the encoder. The bridge will create the

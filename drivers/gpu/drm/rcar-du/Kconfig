@@ -39,4 +39,4 @@ config DRM_RCAR_VSP
 
 config DRM_RCAR_WRITEBACK
 	bool
-	default y if ARM64
+	default y if (ARM64 || COMPILE_TEST)

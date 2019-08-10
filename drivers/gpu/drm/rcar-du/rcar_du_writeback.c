@@ -137,14 +137,15 @@ static const struct drm_connector_funcs rcar_du_wb_conn_funcs = {
 	.atomic_destroy_state = rcar_du_wb_conn_destroy_state,
 };
 
-static int rcar_du_wb_enc_atomic_check(struct drm_encoder *encoder,
-				       struct drm_crtc_state *crtc_state,
-				       struct drm_connector_state *conn_state)
+static int rcar_du_wb_bridge_atomic_check(struct drm_bridge *bridge,
+					struct drm_bridge_state *bridge_state,
+					struct drm_crtc_state *crtc_state,
+					struct drm_connector_state *conn_state)
 {
 	struct rcar_du_wb_conn_state *wb_state =
 		to_rcar_wb_conn_state(conn_state);
 	const struct drm_display_mode *mode = &crtc_state->mode;
-	struct drm_device *dev = encoder->dev;
+	struct drm_device *dev = bridge->dev;
 	struct drm_framebuffer *fb;
 
 	if (!conn_state->writeback_job || !conn_state->writeback_job->fb)
@@ -172,8 +173,8 @@ static int rcar_du_wb_enc_atomic_check(struct drm_encoder *encoder,
 	return 0;
 }
 
-static const struct drm_encoder_helper_funcs rcar_du_wb_enc_helper_funcs = {
-	.atomic_check = rcar_du_wb_enc_atomic_check,
+static const struct drm_bridge_funcs rcar_du_wb_bridge_funcs = {
+	.atomic_check = rcar_du_wb_bridge_atomic_check,
 };
 
 /*
@@ -201,12 +202,10 @@ int rcar_du_writeback_init(struct rcar_du_device *rcdu,
 	struct drm_writeback_connector *wb_conn = &rcrtc->writeback;
 
 	wb_conn->encoder.possible_crtcs = 1 << drm_crtc_index(&rcrtc->crtc);
-	drm_connector_helper_add(&wb_conn->base,
-				 &rcar_du_wb_conn_helper_funcs);
+	wb_conn->encoder.bridge.funcs = &rcar_du_wb_bridge_funcs;
 
 	return drm_writeback_connector_init(rcdu->ddev, wb_conn,
-					    &rcar_du_wb_conn_funcs,
-					    &rcar_du_wb_enc_helper_funcs,
+					    &rcar_du_wb_conn_funcs, NULL,
 					    writeback_formats,
 					    ARRAY_SIZE(writeback_formats));
 }
