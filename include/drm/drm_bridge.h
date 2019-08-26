@@ -409,6 +409,17 @@ struct drm_bridge *of_drm_find_bridge(struct device_node *np);
 int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
 		      struct drm_bridge *previous);
 
+/**
+ * for_each_bridge_in_chain() - Iterate over all bridges present in a chain
+ * @encoder: the encoder to iterate bridges on
+ * @bridge: a bridge pointer updated to point to the current bridge at each
+ *	    iteration
+ *
+ * Iterate over all bridges present in the bridge chain attached to @encoder.
+ */
+#define drm_for_each_bridge_in_chain(encoder, bridge)			\
+	list_for_each_entry(bridge, &(encoder)->bridge_chain, chain_node)
+
 struct drm_bridge *
 drm_bridge_chain_get_next_bridge(struct drm_bridge *bridge);
 bool drm_bridge_chain_mode_fixup(struct drm_bridge *bridge,
