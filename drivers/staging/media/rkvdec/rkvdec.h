@@ -120,4 +120,5 @@ struct rkvdec_aux_buf {
 void rkvdec_run_preamble(struct rkvdec_ctx *ctx, struct rkvdec_run *run);
 void rkvdec_run_postamble(struct rkvdec_ctx *ctx, struct rkvdec_run *run);
 
+extern const struct rkvdec_coded_fmt_ops rkvdec_h264_fmt_ops;
 #endif /* RKVDEC_H_ */
