@@ -973,9 +973,16 @@ static void config_registers(struct rkvdec_ctx *ctx,
 		struct vb2_buffer *vb_buf = get_ref_buf(ctx, run, i);
 
 		refer_addr = vb2_dma_contig_plane_dma_addr(vb_buf, 0) |
-			     RKVDEC_COLMV_USED_FLAG_REF |
-			     RKVDEC_TOPFIELD_USED_REF |
-			     RKVDEC_BOTFIELD_USED_REF;
+			     RKVDEC_COLMV_USED_FLAG_REF;
+
+		if (!(dpb[i].flags & V4L2_H264_DPB_ENTRY_FLAG_FIELD))
+			refer_addr |= RKVDEC_TOPFIELD_USED_REF |
+				      RKVDEC_BOTFIELD_USED_REF;
+		else if (dpb[i].flags & V4L2_H264_DPB_ENTRY_FLAG_BOTTOM_FIELD)
+			refer_addr |= RKVDEC_BOTFIELD_USED_REF;
+		else
+			refer_addr |= RKVDEC_TOPFIELD_USED_REF;
+
 		writel_relaxed(dpb[i].top_field_order_cnt,
 			       rkvdec->regs +  poc_reg_tbl_top_field[i]);
 		writel_relaxed(dpb[i].bottom_field_order_cnt,
