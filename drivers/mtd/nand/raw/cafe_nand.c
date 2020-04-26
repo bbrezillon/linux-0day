@@ -942,7 +942,7 @@ static int cafe_nand_probe(struct pci_dev *pdev,
 	if (err)
 		goto out_cleanup_nand;
 
-	goto out;
+	return 0;
 
  out_cleanup_nand:
 	nand_cleanup(&cafe->nand);
@@ -953,7 +953,6 @@ static int cafe_nand_probe(struct pci_dev *pdev,
 		    GLOBAL_IRQ_MASK);
  out_ior:
 	pci_iounmap(pdev, cafe->mmio);
- out:
 	return err;
 }
 
