@@ -187,10 +187,17 @@ static void cafe_write_buf(struct nand_chip *chip, const void *buf, unsigned int
 {
 	struct cafe_priv *cafe = nand_get_controller_data(chip);
 
-	if (cafe->usedma)
+	if (cafe->usedma) {
 		memcpy(cafe->dmabuf, buf, len);
-	else
-		memcpy_toio(cafe->mmio + CAFE_NAND_WRITE_DATA, buf, len);
+	} else {
+		memcpy_toio(cafe->mmio + CAFE_NAND_WRITE_DATA, buf,
+			    len & ~0x3);
+		if (len & 0x3) {
+			u32 tmp = 0;
+			memcpy(&tmp, buf + (len & ~0x3), len & 0x3);
+			cafe_writel(cafe, tmp, NAND_WRITE_DATA);
+		}
+	}
 
 	dev_dbg(&cafe->pdev->dev, "Copy 0x%x bytes to write buffer.\n",	len);
 }
@@ -199,10 +206,16 @@ static void cafe_read_buf(struct nand_chip *chip, void *buf, unsigned int len)
 {
 	struct cafe_priv *cafe = nand_get_controller_data(chip);
 
-	if (cafe->usedma)
+	if (cafe->usedma) {
 		memcpy(buf, cafe->dmabuf, len);
-	else
-		memcpy_fromio(buf, cafe->mmio + CAFE_NAND_READ_DATA, len);
+	} else {
+		memcpy_fromio(buf, cafe->mmio + CAFE_NAND_READ_DATA,
+			      len & ~0x3);
+		if (len & 0x3) {
+			u32 tmp = cafe_readl(cafe, NAND_READ_DATA);
+			memcpy(buf + (len & ~0x3), &tmp, len & 0x3);
+		}
+	}
 
 	dev_dbg(&cafe->pdev->dev, "Copy 0x%x bytes from read buffer.\n", len);
 }
