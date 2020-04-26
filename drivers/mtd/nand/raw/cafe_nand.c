@@ -153,7 +153,6 @@ struct cafe_priv {
 	struct rs_control *rs;
 	uint32_t ctl1;
 	uint32_t ctl2;
-	int datalen;
 	int nr_data;
 	int data_pos;
 	int page_addr;
@@ -189,14 +188,11 @@ static void cafe_write_buf(struct nand_chip *chip, const void *buf, unsigned int
 	struct cafe_priv *cafe = nand_get_controller_data(chip);
 
 	if (cafe->usedma)
-		memcpy(cafe->dmabuf + cafe->datalen, buf, len);
+		memcpy(cafe->dmabuf, buf, len);
 	else
-		memcpy_toio(cafe->mmio + CAFE_NAND_WRITE_DATA + cafe->datalen, buf, len);
+		memcpy_toio(cafe->mmio + CAFE_NAND_WRITE_DATA, buf, len);
 
-	cafe->datalen += len;
-
-	dev_dbg(&cafe->pdev->dev, "Copy 0x%x bytes to write buffer. datalen 0x%x\n",
-		len, cafe->datalen);
+	dev_dbg(&cafe->pdev->dev, "Copy 0x%x bytes to write buffer.\n",	len);
 }
 
 static void cafe_read_buf(struct nand_chip *chip, void *buf, unsigned int len)
@@ -204,13 +200,11 @@ static void cafe_read_buf(struct nand_chip *chip, void *buf, unsigned int len)
 	struct cafe_priv *cafe = nand_get_controller_data(chip);
 
 	if (cafe->usedma)
-		memcpy(buf, cafe->dmabuf + cafe->datalen, len);
+		memcpy(buf, cafe->dmabuf, len);
 	else
-		memcpy_fromio(buf, cafe->mmio + CAFE_NAND_READ_DATA + cafe->datalen, len);
+		memcpy_fromio(buf, cafe->mmio + CAFE_NAND_READ_DATA, len);
 
-	dev_dbg(&cafe->pdev->dev, "Copy 0x%x bytes from position 0x%x in read buffer.\n",
-		len, cafe->datalen);
-	cafe->datalen += len;
+	dev_dbg(&cafe->pdev->dev, "Copy 0x%x bytes from read buffer.\n", len);
 }
 
 static irqreturn_t cafe_nand_interrupt(int irq, void *id)
@@ -574,7 +568,6 @@ static int cafe_nand_exec_subop(struct nand_chip *chip,
 	if (WARN_ON(subop->cs > 1))
 		return -EINVAL;
 
-	cafe->datalen = 0;
 	ctrl1 |= CAFE_FIELD_PREP(NAND_CTRL1, CE, subop->cs);
 
 	for (i = 0; i < subop->ninstrs; i++) {
