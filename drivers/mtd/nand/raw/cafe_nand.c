@@ -184,7 +184,7 @@ static const char *part_probes[] = { "cmdlinepart", "RedBoot", NULL };
 #define cafe_readl(cafe, addr)			readl((cafe)->mmio + CAFE_##addr)
 #define cafe_writel(cafe, datum, addr)		writel(datum, (cafe)->mmio + CAFE_##addr)
 
-static void cafe_write_buf(struct nand_chip *chip, const uint8_t *buf, int len)
+static void cafe_write_buf(struct nand_chip *chip, const void *buf, unsigned int len)
 {
 	struct cafe_priv *cafe = nand_get_controller_data(chip);
 
@@ -199,7 +199,7 @@ static void cafe_write_buf(struct nand_chip *chip, const uint8_t *buf, int len)
 		len, cafe->datalen);
 }
 
-static void cafe_read_buf(struct nand_chip *chip, uint8_t *buf, int len)
+static void cafe_read_buf(struct nand_chip *chip, void *buf, unsigned int len)
 {
 	struct cafe_priv *cafe = nand_get_controller_data(chip);
 
