@@ -261,7 +261,6 @@ static void cafe_nand_cmdfunc(struct nand_chip *chip, unsigned command,
 			    CAFE_FIELD_PREP(NAND_CTRL2, CMD2, command),
 			    NAND_CTRL2);
 		ctl1 = cafe->ctl1;
-		cafe->ctl2 &= ~CAFE_NAND_CTRL2_AUTO_WRITE_ECC;
 		dev_dbg(&cafe->pdev->dev, "Continue command, ctl1 %08x, #data %d\n",
 			cafe->ctl1, cafe->nr_data);
 		goto do_command;
@@ -643,6 +642,7 @@ static int cafe_nand_write_page_lowlevel(struct nand_chip *chip,
 {
 	struct mtd_info *mtd = nand_to_mtd(chip);
 	struct cafe_priv *cafe = nand_get_controller_data(chip);
+	int ret;
 
 	nand_prog_page_begin_op(chip, page, 0, buf, mtd->writesize);
 	chip->legacy.write_buf(chip, chip->oob_poi, mtd->oobsize);
@@ -650,7 +650,14 @@ static int cafe_nand_write_page_lowlevel(struct nand_chip *chip,
 	/* Set up ECC autogeneration */
 	cafe->ctl2 |= CAFE_NAND_CTRL2_AUTO_WRITE_ECC;
 
-	return nand_prog_page_end_op(chip);
+	ret = nand_prog_page_end_op(chip);
+
+	/*
+	 * And clear it before returning so that following write operations
+	 * that do not involve ECC don't generate ECC bytes.
+	 */
+	cafe->ctl2 &= ~CAFE_NAND_CTRL2_AUTO_WRITE_ECC;
+	return ret;
 }
 
 static int cafe_nand_block_bad(struct nand_chip *chip, loff_t ofs)
